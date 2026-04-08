@@ -1,0 +1,13 @@
+// weather-card.ame
+// Scenario: Current weather display for a single city
+// Lines: 9 | Tokens: 131 (measured via Gemini gemini-2.0-flash)
+//
+root = card([weather_header, temp, condition, details])
+weather_header = row([city, weather_icon], space_between)
+city = txt("San Francisco", title)
+weather_icon = icon("partly_cloudy_day", 28)
+temp = txt("62°", display)
+condition = txt("Partly Cloudy", body)
+details = row([high_low, humidity], space_between)
+high_low = txt("H:68°  L:55°", caption)
+humidity = txt("Humidity: 72%", caption)

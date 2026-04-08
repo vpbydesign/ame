@@ -1,0 +1,28 @@
+# AME Specification and Reference Implementation — Code Owners
+#
+# Each line maps a path pattern to one or more GitHub usernames.
+# PR reviews are requested from matching owners automatically.
+
+# Specification documents — require spec owner review
+/specification/ @ame-spec-owners
+
+# Kotlin parser and data model
+/ame-core/ @ame-kotlin-owners
+
+# Jetpack Compose renderer
+/ame-compose/ @ame-kotlin-owners
+
+# Swift parser and SwiftUI renderer
+/ame-swiftui/ @ame-swift-owners
+
+# Benchmarks — any maintainer
+/benchmarks/ @ame-spec-owners
+
+# Conformance tests — require both platform owners
+/conformance/ @ame-kotlin-owners @ame-swift-owners
+
+# Examples
+/examples/ @ame-spec-owners
+
+# Root files (README, LICENSE, etc.)
+/* @ame-spec-owners

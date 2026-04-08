@@ -1,0 +1,8 @@
+// conformance/10-each-empty-array.ame
+// Tests: each() with empty array produces zero children
+root = col([title, items])
+title = txt("Empty List", headline)
+items = each($things, item_tpl)
+item_tpl = txt($label, body)
+---
+{"things": []}

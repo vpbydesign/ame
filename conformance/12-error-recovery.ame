@@ -1,0 +1,5 @@
+// conformance/12-error-recovery.ame
+// Tests: unknown component produces warning txt node
+root = col([valid, invalid_one])
+valid = txt("This is fine", body)
+invalid_one = banana("not a real component")

@@ -1,0 +1,12 @@
+// conformance/04-card-badge-progress.ame
+// Tests: card container, badge (all variants), progress bar
+root = col([status_card, progress_bar])
+status_card = card([card_title, badges_row])
+card_title = txt("Status Overview", title)
+badges_row = row([b_default, b_success, b_warning, b_error, b_info], 4)
+b_default = badge("Default")
+b_success = badge("OK", success)
+b_warning = badge("Warn", warning)
+b_error = badge("Fail", error)
+b_info = badge("Info", info)
+progress_bar = progress(0.75, "Loading")

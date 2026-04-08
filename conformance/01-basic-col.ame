@@ -1,0 +1,5 @@
+// conformance/01-basic-col.ame
+// Tests: col layout, txt with headline style, txt with default (body) style
+root = col([greeting, subtitle])
+greeting = txt("Hello, World!", headline)
+subtitle = txt("Welcome to AME")

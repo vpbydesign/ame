@@ -1,0 +1,1 @@
+{"_type":"col","children":[{"_type":"row","children":[{"_type":"txt","text":"Left"},{"_type":"txt","text":"Right"}]},{"_type":"row","children":[{"_type":"txt","text":"A"},{"_type":"txt","text":"B"}],"gap":16},{"_type":"row","align":"space_between","children":[{"_type":"txt","text":"Start"},{"_type":"txt","text":"End"}]}]}

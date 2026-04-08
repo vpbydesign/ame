@@ -1,0 +1,7 @@
+// conformance/09-path-resolution.ame
+// Tests: $path resolution at root scope (no each())
+root = card([name_txt, role_txt])
+name_txt = txt($user/name, title)
+role_txt = txt($user/role, caption)
+---
+{"user": {"name": "Jane Doe", "role": "Engineer"}}

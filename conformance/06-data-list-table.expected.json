@@ -1,0 +1,1 @@
+{"_type":"col","children":[{"_type":"list","children":[{"_type":"txt","text":"First Item"},{"_type":"txt","text":"Second Item"},{"_type":"txt","text":"Third Item"}]},{"_type":"table","headers":["Name","Score"],"rows":[["Alice","95"],["Bob","87"],["Carol","92"]]}]}

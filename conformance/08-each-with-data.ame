@@ -1,0 +1,11 @@
+// conformance/08-each-with-data.ame
+// Tests: each() with data section, expanded children with $path resolution
+root = col([title, results])
+title = txt("Restaurants", headline)
+results = each($places, place_tpl)
+place_tpl = card([txt($name, title), txt($address, caption)])
+---
+{"places": [
+  {"name": "Luigi's", "address": "119 Mulberry St"},
+  {"name": "Bella Napoli", "address": "225 Broadway"}
+]}

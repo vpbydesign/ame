@@ -1,0 +1,7 @@
+// conformance/07-forward-refs.ame
+// Tests: forward references (child used before defined)
+root = col([header, content])
+header = txt("Forward Ref Test", headline)
+content = card([detail_text, detail_badge])
+detail_text = txt("Resolved correctly", body)
+detail_badge = badge("OK", success)

@@ -1,0 +1,14 @@
+// booking-form.ame
+// Scenario: Dinner reservation form with inputs and submit button
+// Lines: 10 | Tokens: 188 (measured via Gemini gemini-2.0-flash)
+//
+root = card([form_title, form_fields, form_actions])
+form_title = txt("Book a Table", headline)
+form_fields = col([date_field, time_field, guests_field, notes_field])
+date_field = input("date", "Date", date)
+time_field = input("time", "Time", time)
+guests_field = input("guests", "Number of Guests", select, options=["1","2","3","4","5","6","7","8"])
+notes_field = input("notes", "Special Requests", text)
+form_actions = row([cancel_btn, confirm_btn], space_between)
+cancel_btn = btn("Cancel", nav("home"), text)
+confirm_btn = btn("Confirm Booking", submit(create_reservation, restaurant="Luigi's"), primary)

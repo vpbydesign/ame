@@ -1,0 +1,8 @@
+// conformance/11-each-missing-path.ame
+// Tests: each() where $path does not exist in data, produces zero children
+root = col([title, items])
+title = txt("Missing Path", headline)
+items = each($nonexistent, item_tpl)
+item_tpl = txt($label, body)
+---
+{"other_key": "value"}

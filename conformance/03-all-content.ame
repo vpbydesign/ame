@@ -1,0 +1,15 @@
+// conformance/03-all-content.ame
+// Tests: txt (all styles), img, icon, divider, spacer
+root = col([t_display, t_headline, t_title, t_body, t_caption, t_mono, t_label, t_overline, image, the_icon, the_divider, the_spacer])
+t_display = txt("Display Text", display)
+t_headline = txt("Headline Text", headline)
+t_title = txt("Title Text", title)
+t_body = txt("Body Text", body)
+t_caption = txt("Caption Text", caption)
+t_mono = txt("Mono Text", mono)
+t_label = txt("Label Text", label)
+t_overline = txt("Overline Text", overline)
+image = img("https://example.com/photo.jpg", 200)
+the_icon = icon("star", 24)
+the_divider = divider()
+the_spacer = spacer()

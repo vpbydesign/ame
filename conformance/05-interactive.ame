@@ -1,0 +1,14 @@
+// conformance/05-interactive.ame
+// Tests: btn (all 5 action types), input (text, number, select), toggle
+root = col([buttons, form_fields])
+buttons = col([btn_tool, btn_uri, btn_nav, btn_copy, btn_submit])
+btn_tool = btn("Search", tool(web_search, query="AME spec"))
+btn_uri = btn("Open Maps", uri("geo:37.7749,-122.4194"))
+btn_nav = btn("Settings", nav("settings/profile"))
+btn_copy = btn("Copy ID", copy("abc-123"))
+btn_submit = btn("Submit", submit(save_form), secondary)
+form_fields = col([text_input, num_input, select_input, dark_toggle])
+text_input = input("name", "Full Name")
+num_input = input("age", "Age", number)
+select_input = input("color", "Favorite Color", select, ["Red", "Green", "Blue"])
+dark_toggle = toggle("dark_mode", "Dark Mode")

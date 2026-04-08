@@ -1,0 +1,6 @@
+// conformance/02-row-layout.ame
+// Tests: row with align, gap, space_between
+root = col([row_default, row_gap, row_aligned])
+row_default = row([txt("Left"), txt("Right")])
+row_gap = row([txt("A"), txt("B")], 16)
+row_aligned = row([txt("Start"), txt("End")], space_between)

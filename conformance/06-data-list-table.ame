@@ -1,0 +1,8 @@
+// conformance/06-data-list-table.ame
+// Tests: list with dividers, table with headers and rows
+root = col([item_list, scores_table])
+item_list = list([item1, item2, item3])
+item1 = txt("First Item", body)
+item2 = txt("Second Item", body)
+item3 = txt("Third Item", body)
+scores_table = table(["Name", "Score"], [["Alice", "95"], ["Bob", "87"], ["Carol", "92"]])
