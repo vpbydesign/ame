@@ -48,8 +48,8 @@ can be embedded in any capability context.
 capability lists):
 
 ```
-AME_SUPPORT: v1.0
-AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress
+AME_SUPPORT: v1.1
+AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress, chart, code, accordion, carousel, callout, timeline
 ```
 
 **As JSON** (for structured capability responses, agent cards, or metadata):
@@ -60,7 +60,8 @@ AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, ta
     "version": "1.0",
     "catalog": [
       "col", "row", "txt", "btn", "card", "badge", "icon", "img",
-      "input", "toggle", "list", "table", "divider", "spacer", "progress"
+      "input", "toggle", "list", "table", "divider", "spacer", "progress",
+      "chart", "code", "accordion", "carousel", "callout", "timeline"
     ]
   }
 }
@@ -78,11 +79,12 @@ AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, ta
    text fallback (per [syntax.md](syntax.md) error handling rules) and
    SHOULD log a warning.
 
-3. The 15 standard primitives (`col`, `row`, `txt`, `btn`, `card`, `badge`,
+3. The 21 standard primitives (`col`, `row`, `txt`, `btn`, `card`, `badge`,
    `icon`, `img`, `input`, `toggle`, `list`, `table`, `divider`, `spacer`,
-   `progress`) SHOULD be listed if the host supports AME Core Conformance
+   `progress`, `chart`, `code`, `accordion`, `carousel`, `callout`,
+   `timeline`) SHOULD be listed if the host supports AME Core Conformance
    (see [specification README](README.md)). A host MAY list a subset if it
-   does not implement all 15 primitives, but this reduces what agents can
+   does not implement all 21 primitives, but this reduces what agents can
    generate.
 
 4. Custom components (defined by the host app, not by the AME spec) MAY be
@@ -93,8 +95,8 @@ AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, ta
 **Example with custom components:**
 
 ```
-AME_SUPPORT: v1.0
-AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress, MapView, AudioPlayer, VideoCard
+AME_SUPPORT: v1.1
+AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress, chart, code, accordion, carousel, callout, timeline, MapView, AudioPlayer, VideoCard
 ```
 
 ### When No Declaration Is Present
@@ -118,18 +120,18 @@ the AME syntax and listing the available primitives.
 ### Standard AME Prompt Section
 
 The following is the RECOMMENDED system prompt section for host apps that
-support AME v1.0 with the standard 15 primitives. It is designed to be
-compact (~250 tokens) while being sufficient for the LLM to generate valid
-AME syntax.
+support AME v1.1 with the standard 21 primitives. It is designed to be
+compact (~350-400 tokens) while being sufficient for the LLM to generate
+valid AME syntax.
 
 ```
 --- AME UI Generation ---
-When you want to show rich interactive UI (cards, forms, lists, buttons),
-generate an AME document. AME is a line-oriented syntax where each line
-binds an identifier to a component.
+When you want to show rich interactive UI (cards, forms, lists, buttons,
+charts, timelines), generate an AME document. AME is a line-oriented syntax
+where each line binds an identifier to a component.
 
-AME_SUPPORT: v1.0
-AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress
+AME_SUPPORT: v1.1
+AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress, chart, code, accordion, carousel, callout, timeline
 
 Rules:
 - One statement per line: identifier = Component(args)
@@ -139,14 +141,21 @@ Rules:
 - IMPORTANT: Every identifier in a children array MUST be defined on its own line
 
 Primitives:
-col([children]) row([children], align?) txt("text", style?) btn("label", action, style?)
-card([children]) badge("label", variant?) icon("name") img("url", height?)
+col([children]) row([children], align?) txt("text", style?, color?) btn("label", action, style?)
+card([children]) badge("label", variant?, color?) icon("name") img("url", height?)
 input(id, "label", type?) toggle(id, "label") list([children]) table(headers, rows)
 divider() spacer(height?) progress(value, "label"?)
+chart(type, values, labels?, height?) — data visualization. type: line|bar|pie|sparkline
+code(lang, content, title?) — syntax-highlighted code block with copy
+accordion(title, [children], expanded?) — collapsible section
+carousel([children], peek?) — horizontal scrollable container
+callout(type, content, title?) — alert/info box. type: info|warning|error|success|tip
+timeline([items]) — ordered event sequence. Items: timeline_item(title, subtitle?, status?)
 
 Styles: display, headline, title, body, caption, mono, label
 Button styles: primary, secondary, outline, text, destructive
 Badge variants: default, success, warning, error, info
+Semantic colors (named arg color=): primary, secondary, error, success, warning
 
 Actions:
 tool(name, key=val)  - invoke a tool
@@ -196,6 +205,54 @@ share_btn = btn("Share", copy("San Francisco: 62°F, Partly Cloudy"), text)
    text. A RECOMMENDED instruction: "Use AME when showing structured results
    (search results, forms, comparisons, data cards). Use plain text for
    conversational responses, explanations, and simple answers."
+
+### Custom Component Parameter Schema (`AME_CUSTOM`)
+
+The `AME_CUSTOM` declaration provides typed parameter schemas for custom
+components listed in `AME_CATALOG`. It appears in the system prompt or
+capability response alongside `AME_SUPPORT` and `AME_CATALOG`.
+
+**Format:**
+
+```
+AME_CUSTOM: ComponentName(param1: type, param2?: type, param3?: type = default)
+```
+
+**Supported types:** `string`, `number`, `boolean`, `array`, `enum(val1|val2|val3)`
+
+**Required vs optional:** Parameters without `?` are required. Parameters
+with `?` are optional. Parameters with `= default` have a default value.
+
+**Examples:**
+
+```
+AME_SUPPORT: v1.1
+AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress, chart, code, accordion, carousel, callout, timeline, MapView, AudioPlayer, RecipeCard
+AME_CUSTOM: MapView(center: string, zoom?: number = 14, markers?: array, height?: number = 200)
+AME_CUSTOM: AudioPlayer(url: string, title?: string, autoplay?: boolean = false)
+AME_CUSTOM: RecipeCard(title: string, prep_time: string, cook_time: string, servings?: number, difficulty?: enum(easy|medium|hard))
+```
+
+An LLM receiving this system prompt can generate:
+```
+map = MapView(center="37.7749,-122.4194", zoom=15, markers=$places, height=250)
+player = AudioPlayer(url="https://example.com/song.mp3", title="Blue in Green")
+recipe = RecipeCard(title="Thai Green Curry", prep_time="15 min", cook_time="30 min", servings=4, difficulty=medium)
+```
+
+**Rules:**
+
+1. `AME_CUSTOM` declarations MUST only reference component names listed in
+   `AME_CATALOG`.
+2. All custom component arguments MUST be named (not positional). This is
+   unchanged from v1.0 — custom components already require named arguments.
+3. An agent MUST NOT generate a custom component without a corresponding
+   `AME_CUSTOM` schema in the prompt.
+4. If a required parameter is omitted by the agent, the renderer SHOULD
+   render a text fallback: `"[MapView: missing required parameter 'center']"`.
+5. If an unknown parameter is provided, the renderer SHOULD ignore it and
+   log a warning.
+6. Multiple `AME_CUSTOM` lines are permitted (one per custom component).
 
 ### Detecting AME in LLM Output
 
@@ -271,7 +328,8 @@ during the `initialize` handshake:
       "version": "1.0",
       "catalog": ["col", "row", "txt", "btn", "card", "badge", "icon",
                    "img", "input", "toggle", "list", "table", "divider",
-                   "spacer", "progress"]
+                   "spacer", "progress", "chart", "code", "accordion",
+                   "carousel", "callout", "timeline"]
     }
   }
 }
@@ -322,7 +380,8 @@ agent card's capabilities:
         "version": "1.0",
         "catalog": ["col", "row", "txt", "btn", "card", "badge", "icon",
                      "img", "input", "toggle", "list", "table", "divider",
-                     "spacer", "progress"]
+                     "spacer", "progress", "chart", "code", "accordion",
+                     "carousel", "callout", "timeline"]
       }
     ]
   }
@@ -534,4 +593,5 @@ mechanisms:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0 | 2026-04-05 | Initial specification |
+| 1.0 | 2026-04-05 | Initial specification — 15 standard primitives, system prompt template (~250 tokens), MCP/A2A/standalone integration guidance |
+| 1.1 | 2026-04-08 | Updated to 21 standard primitives. System prompt template expanded (~350-400 tokens). Added AME_CUSTOM parameter schema for typed custom component declarations. All AME_CATALOG examples updated. |

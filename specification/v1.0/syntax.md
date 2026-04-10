@@ -69,7 +69,7 @@ by parentheses containing zero or more arguments.
 header = txt("Hello World", title)
 ```
 
-The component name MUST be one of the 15 standard primitives defined in
+The component name MUST be one of the 21 standard primitives defined in
 [primitives.md](primitives.md), or a custom component name registered in the
 host app's catalog. See [Custom Components](#custom-components) below.
 
@@ -300,7 +300,9 @@ data_ref       = "$" , identifier , { "/" , identifier } ;
 component_name = standard_primitive | identifier ;
 standard_primitive = "col" | "row" | "txt" | "btn" | "card" | "badge"
                    | "icon" | "img" | "input" | "toggle" | "list"
-                   | "table" | "divider" | "spacer" | "progress" ;
+                   | "table" | "divider" | "spacer" | "progress"
+                   | "chart" | "code" | "accordion" | "carousel"
+                   | "callout" | "timeline" | "timeline_item" ;
 action_name    = "tool" | "uri" | "nav" | "copy" | "submit" ;
 
 (* === Tokens === *)
@@ -571,7 +573,8 @@ as user-defined identifiers.
 ### Standard Primitive Names
 
 `col`, `row`, `txt`, `btn`, `card`, `badge`, `icon`, `img`, `input`,
-`toggle`, `list`, `table`, `divider`, `spacer`, `progress`
+`toggle`, `list`, `table`, `divider`, `spacer`, `progress`, `chart`,
+`code`, `accordion`, `carousel`, `callout`, `timeline`, `timeline_item`
 
 ### Action Names
 
@@ -605,6 +608,28 @@ as user-defined identifiers.
 
 `start`, `center`, `end`, `space_between`, `space_around`
 
+### ChartType Enum Values
+
+`line`, `bar`, `pie`, `sparkline`
+
+### CalloutType Enum Values
+
+`info`, `warning`, `error`, `success`, `tip`
+
+### TimelineStatus Enum Values
+
+`done`, `active`, `pending`, `error`
+
+### SemanticColor Enum Values
+
+`primary`, `secondary`, `error`, `success`, `warning`
+
+Note: `error` appears in `CalloutType`, `TimelineStatus`, and
+`SemanticColor`. The parser disambiguates by argument position — `error`
+in a callout's first argument is `CalloutType.error`; in a timeline_item's
+third argument it is `TimelineStatus.error`; as a `color=` named argument
+it is `SemanticColor.error`.
+
 ### Data Separator
 
 `---` (three hyphens on a line by themselves)
@@ -613,7 +638,7 @@ as user-defined identifiers.
 
 ## Custom Components
 
-Host applications MAY register custom component names beyond the 15 standard
+Host applications MAY register custom component names beyond the 21 standard
 primitives. Custom components are rendered by the host app's renderer, not by
 the AME standard library.
 
@@ -622,7 +647,8 @@ capability announcement so the LLM knows they are available:
 
 ```
 AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle,
-  list, table, divider, spacer, progress, MapView, PlaceCard, AudioPlayer
+  list, table, divider, spacer, progress, chart, code, accordion, carousel,
+  callout, timeline, MapView, PlaceCard, AudioPlayer
 ```
 
 Custom component arguments are always named (not positional), since the AME
@@ -635,7 +661,9 @@ player = AudioPlayer(track_url="https://example.com/song.mp3", autoplay=false)
 
 The AME specification does not define how custom component catalogs are
 structured or negotiated. This is left to the host application and the
-agent framework in use.
+agent framework in use. For a formal way to declare custom component
+parameter types, see the `AME_CUSTOM` declaration in
+[integration.md](integration.md).
 
 ---
 
@@ -653,7 +681,7 @@ for elements exceeding the limit.
 
 ### Maximum Document Length
 
-AME documents SHOULD NOT exceed 50 lines (excluding comments and empty lines).
+AME documents SHOULD NOT exceed 60 lines (excluding comments and empty lines).
 Documents exceeding this length indicate a UI that is likely too complex for
 an inline chat card and SHOULD be rendered as a dedicated screen instead.
 
@@ -688,7 +716,7 @@ AME differs from OpenUI Lang in the following ways:
 |--------|-----|-------------|
 | Target platform | Mobile (Compose, SwiftUI) | Web (React) |
 | Schema dependency | None | Zod schemas define argument order |
-| Component catalog | 15 built-in primitives + custom | Defined entirely by app's Zod schemas |
+| Component catalog | 21 built-in primitives + custom | Defined entirely by app's Zod schemas |
 | Actions | Inline `tool()`, `uri()`, `nav()`, `copy()`, `submit()` | Component callbacks |
 | Data binding | `$path` references + `---` separator | JavaScript variable references |
 | Template rendering | `each($array, template_id)` | Array `.map()` in JavaScript |
@@ -701,4 +729,5 @@ AME differs from OpenUI Lang in the following ways:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0 | 2026-04-05 | Initial specification |
+| 1.0 | 2026-04-05 | Initial specification — 15 standard primitives, EBNF grammar, error handling rules |
+| 1.1 | 2026-04-08 | Updated EBNF grammar to 21 standard primitives. Added ChartType, CalloutType, TimelineStatus, SemanticColor to reserved keywords. Maximum document length increased from 50 to 60 lines. AME_CUSTOM cross-reference added to Custom Components section. |
