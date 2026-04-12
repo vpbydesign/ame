@@ -1,0 +1,5 @@
+// conformance/30-carousel-peek.ame
+// Tests: carousel with custom peek value
+root = carousel([c1, c2], peek=48)
+c1 = txt("Slide One", headline)
+c2 = txt("Slide Two", headline)

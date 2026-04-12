@@ -1,0 +1,5 @@
+// conformance/24-accordion-basic.ame
+// Tests: accordion with children, collapsed by default
+root = accordion("Side Effects", [s1, s2])
+s1 = txt("Nausea — Common", body)
+s2 = txt("Dizziness — Uncommon", body)

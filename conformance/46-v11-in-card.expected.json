@@ -1,0 +1,1 @@
+{"_type":"card","children":[{"_type":"txt","style":"headline","text":"Monthly Sales"},{"_type":"chart","labels":["Oct","Nov","Dec"],"type":"bar","values":[12.5,18.3,22.7]},{"_type":"callout","content":"Sales increased 15% this quarter.","type":"info"}]}

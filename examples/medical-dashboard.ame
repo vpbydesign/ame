@@ -1,0 +1,14 @@
+// medical-dashboard.ame
+// Scenario: Patient vitals with chart, drug warning callout, and treatment timeline
+// Lines: 9 | Tokens: 218 (measured via Gemini gemini-2.0-flash)
+// v1.1 primitives: chart, callout, timeline, timeline_item
+//
+root = col([vitals_title, heart_chart, bp_warn, treatment])
+vitals_title = txt("Patient Vitals", headline)
+heart_chart = chart(line, values=[72,75,71,78,82,76], labels=["6am","8am","10am","12pm","2pm","4pm"], height=180)
+bp_warn = callout(warning, "Blood pressure elevated: 145/92 mmHg. Consider dose adjustment.", "Alert")
+treatment = timeline([t1, t2, t3, t4])
+t1 = timeline_item("Lab Work", "Blood panel complete", done)
+t2 = timeline_item("Consultation", "With Dr. Chen at 2pm", done)
+t3 = timeline_item("Medication Review", "Adjusting dosage", active)
+t4 = timeline_item("Follow-up", "Scheduled for next week", pending)

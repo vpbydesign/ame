@@ -62,6 +62,48 @@ public enum InputType: String, Codable, Equatable, CaseIterable, Sendable {
     case select
 }
 
+// MARK: - ChartType
+
+/// Chart visualization type.
+public enum ChartType: String, Codable, Equatable, CaseIterable, Sendable {
+    case line
+    case bar
+    case pie
+    case sparkline
+}
+
+// MARK: - CalloutType
+
+/// Callout alert type — determines icon and background tint.
+public enum CalloutType: String, Codable, Equatable, CaseIterable, Sendable {
+    case info
+    case warning
+    case error
+    case success
+    case tip
+}
+
+// MARK: - TimelineStatus
+
+/// Timeline step status — determines circle style and connector line.
+public enum TimelineStatus: String, Codable, Equatable, CaseIterable, Sendable {
+    case done
+    case active
+    case pending
+    case error
+}
+
+// MARK: - SemanticColor
+
+/// Semantic color token for platform-consistent coloring.
+public enum SemanticColor: String, Codable, Equatable, CaseIterable, Sendable {
+    case primary
+    case secondary
+    case error
+    case success
+    case warning
+}
+
 // MARK: - AmeKeywords
 
 /// Reserved keywords and parser lookup utilities.
@@ -70,7 +112,8 @@ public struct AmeKeywords {
 
     public static let standardPrimitives: Set<String> = [
         "col", "row", "txt", "btn", "card", "badge", "icon", "img",
-        "input", "toggle", "list", "table", "divider", "spacer", "progress"
+        "input", "toggle", "list", "table", "divider", "spacer", "progress",
+        "chart", "code", "accordion", "carousel", "callout", "timeline", "timeline_item"
     ]
 
     public static let actionNames: Set<String> = ["tool", "uri", "nav", "copy", "submit"]
@@ -106,5 +149,21 @@ public struct AmeKeywords {
 
     public static func parseInputType(_ value: String) -> InputType? {
         InputType.allCases.first { $0.rawValue.caseInsensitiveCompare(value) == .orderedSame }
+    }
+
+    public static func parseChartType(_ value: String) -> ChartType? {
+        ChartType.allCases.first { $0.rawValue.caseInsensitiveCompare(value) == .orderedSame }
+    }
+
+    public static func parseCalloutType(_ value: String) -> CalloutType? {
+        CalloutType.allCases.first { $0.rawValue.caseInsensitiveCompare(value) == .orderedSame }
+    }
+
+    public static func parseTimelineStatus(_ value: String) -> TimelineStatus? {
+        TimelineStatus.allCases.first { $0.rawValue.caseInsensitiveCompare(value) == .orderedSame }
+    }
+
+    public static func parseSemanticColor(_ value: String) -> SemanticColor? {
+        SemanticColor.allCases.first { $0.rawValue.caseInsensitiveCompare(value) == .orderedSame }
     }
 }

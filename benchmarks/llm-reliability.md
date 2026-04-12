@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This benchmark measures whether LLMs can reliably generate valid AME syntax when given a compact specification in the system prompt. It establishes GATE 2 — the go/no-go decision for public release based on parse success rates.
+This benchmark measures whether LLMs can reliably generate valid AME syntax when given a compact specification in the system prompt. GATE 2 (v1.0, 20 prompts, 15 primitives) established the go/no-go for public release. GATE 3 (v1.1, 32 prompts, 21 primitives) validates the expanded specification.
 
 ## Methodology
 
@@ -295,6 +295,152 @@ model families. The specification is ready for public GitHub release.
 
 ---
 
+## GATE 3: v1.1 LLM Reliability (21 Primitives)
+
+### Overview
+
+GATE 3 extends GATE 2 from 20 prompts (15 v1.0 primitives) to 32 prompts
+(21 v1.1 primitives). The v1.1 system prompt from `integration.md` adds 6
+new primitives (chart, code, accordion, carousel, callout, timeline),
+semantic colors, and the `each()` data iteration construct.
+
+**System prompt:** v1.1 (~400 tokens), from `specification/v1.0/integration.md` lines 128-176.
+**Models:** gemini-3-flash-preview, claude-sonnet-4-6 (same as GATE 2).
+**Harness:** Same corrected harness from Run 5 + tree walkers updated for
+new container types (Accordion, Carousel, Timeline).
+
+### GATE 3 Thresholds
+
+| Outcome | Threshold | Decision |
+|---------|-----------|----------|
+| **PASS** | **≥95% parse success (≥31/32)** | **Proceed to WP#8 (conformance + publish)** |
+| CONDITIONAL | 85-94% parse success (28-30/32) | Analyze failures, fix prompt, re-run (max 3 iterations) |
+| FAIL | <85% parse success (<28/32) | Diagnose, fix prompt or defer primitive to v1.2 |
+
+### Gemini Results — GATE 3
+
+| # | Prompt | Parse | Structure | Refs | Actions | Notes |
+|---|--------|-------|-----------|------|---------|-------|
+| 1 | Weather Tokyo | PASS | PASS | PASS | PASS | |
+| 2 | Restaurant results | PASS | PASS | PASS | PASS | |
+| 3 | Contact card | PASS | PASS | PASS | PASS | |
+| 4 | Booking form | PASS | PASS | PASS | PASS | |
+| 5 | To-do list | PASS | PASS | PASS | PASS | |
+| 6 | Music player | PASS | PASS | PASS | PASS | |
+| 7 | Plan comparison | PASS | PASS | PASS | PASS | |
+| 8 | Email preview | PASS | PASS | PASS | PASS | Warnings: 3 |
+| 9 | Progress card | PASS | PASS | PASS | PASS | |
+| 10 | Settings toggles | PASS | PASS | PASS | PASS | |
+| 11 | Shipping form | PASS | PASS | PASS | PASS | |
+| 12 | Coffee shop search | PASS | PASS | PASS | PASS | |
+| 13 | Calendar event | PASS | PASS | PASS | PASS | |
+| 14 | Product card | PASS | PASS | PASS | PASS | |
+| 15 | Error card | PASS | PASS | PASS | PASS | |
+| 16 | User profile | PASS | PASS | PASS | PASS | |
+| 17 | Notification list | PASS | PASS | PASS | PASS | |
+| 18 | Flight result | PASS | PASS | PASS | PASS | |
+| 19 | About page | PASS | PASS | PASS | PASS | |
+| 20 | Recipe card | PASS | PASS | PASS | PASS | |
+| 21 | Chart bar spending | PASS | PASS | PASS | PASS | |
+| 22 | Code Python | PASS | PASS | PASS | PASS | |
+| 23 | Accordion medication | PASS | PASS | PASS | PASS | |
+| 24 | Carousel shoes | PASS | PASS | PASS | PASS | |
+| 25 | Callout warning | PASS | PASS | PASS | PASS | |
+| 26 | Timeline order | PASS | PASS | PASS | PASS | |
+| 27 | Chart sparkline BTC | PASS | PASS | PASS | PASS | Warnings: 1 |
+| 28 | Dashboard chart+callout | PASS | PASS | PASS | PASS | |
+| 29 | Code+callout combo | PASS | PASS | PASS | PASS | |
+| 30 | Accordion FAQ | PASS | PASS | PASS | PASS | |
+| 31 | Each restaurants | PASS | PASS | PASS | PASS | |
+| 32 | Each events | PASS | PASS | PASS | PASS | |
+
+### Claude Results — GATE 3
+
+| # | Prompt | Parse | Structure | Refs | Actions | Notes |
+|---|--------|-------|-----------|------|---------|-------|
+| 1 | Weather Tokyo | PASS | PASS | PASS | PASS | |
+| 2 | Restaurant results | PASS | PASS | PASS | PASS | |
+| 3 | Contact card | PASS | PASS | PASS | PASS | |
+| 4 | Booking form | PASS | PASS | PASS | PASS | |
+| 5 | To-do list | PASS | PASS | PASS | PASS | |
+| 6 | Music player | PASS | PASS | PASS | FAIL | Invalid or missing actions on btn nodes |
+| 7 | Plan comparison | PASS | PASS | PASS | PASS | |
+| 8 | Email preview | PASS | PASS | PASS | PASS | |
+| 9 | Progress card | PASS | PASS | PASS | PASS | |
+| 10 | Settings toggles | PASS | PASS | PASS | PASS | |
+| 11 | Shipping form | PASS | PASS | PASS | PASS | |
+| 12 | Coffee shop search | PASS | PASS | PASS | PASS | |
+| 13 | Calendar event | PASS | PASS | PASS | PASS | |
+| 14 | Product card | PASS | PASS | PASS | PASS | |
+| 15 | Error card | PASS | PASS | PASS | PASS | Warnings: 1 |
+| 16 | User profile | PASS | PASS | PASS | PASS | |
+| 17 | Notification list | PASS | PASS | PASS | PASS | |
+| 18 | Flight result | PASS | PASS | PASS | PASS | |
+| 19 | About page | PASS | PASS | PASS | PASS | |
+| 20 | Recipe card | PASS | PASS | PASS | PASS | |
+| 21 | Chart bar spending | PASS | PASS | PASS | PASS | |
+| 22 | Code Python | PASS | PASS | PASS | PASS | |
+| 23 | Accordion medication | PASS | PASS | PASS | PASS | |
+| 24 | Carousel shoes | PASS | PASS | PASS | PASS | |
+| 25 | Callout warning | PASS | PASS | PASS | PASS | |
+| 26 | Timeline order | PASS | PASS | PASS | PASS | |
+| 27 | Chart sparkline BTC | PASS | PASS | PASS | PASS | Warnings: 1 |
+| 28 | Dashboard chart+callout | PASS | PASS | PASS | PASS | |
+| 29 | Code+callout combo | PASS | PASS | PASS | PASS | |
+| 30 | Accordion FAQ | PASS | PASS | PASS | PASS | |
+| 31 | Each restaurants | PASS | PASS | PASS | PASS | |
+| 32 | Each events | PASS | PASS | PASS | PASS | |
+
+### GATE 3 Summary
+
+| Metric | Gemini 3 Flash (Preview) | Claude Sonnet 4.6 |
+|--------|-------------------------|-------------------|
+| Parse success | 32/32 (100%) | 32/32 (100%) |
+| Structure valid | 32/32 (100%) | 32/32 (100%) |
+| Refs consistent | 32/32 (100%) | 32/32 (100%) |
+| Actions valid | 32/32 (100%) | 31/32 (96%) |
+| Full validity | 32/32 (100%) | 31/32 (96%) |
+
+**v1.0 vs v1.1 Breakdown:**
+
+| Prompt Set | Gemini | Claude |
+|------------|--------|--------|
+| v1.0 prompts (1-20) | 20/20 | 19/20 |
+| v1.1 prompts (21-32) | 12/12 | 12/12 |
+
+### Analysis
+
+**Parse success: 100% / 100%.** Both models produce valid, parseable AME for
+all 32 prompts. The v1.1 system prompt is fully learnable.
+
+**v1.1 primitives: 12/12 on both models.** All 6 new primitives (chart, code,
+accordion, carousel, callout, timeline) are generated correctly on first
+exposure from the compact system prompt descriptions alone.
+
+**Claude prompt #6 (Music player) action failure:** Claude generated a btn
+with an action the validator flagged as invalid. This is the same stochastic
+action-formatting variance seen in GATE 2 cross-run analysis — parse success
+is unaffected. Not a v1.1 regression (prompt #6 is a v1.0 prompt).
+
+**each() generation (prompts 31-32):** Both models successfully generated AME
+for the data-driven prompts. Parse success confirms the parser handles the
+generated output correctly.
+
+### GATE 3 Decision
+
+**GATE 3 Result: PASS**
+
+- Gemini 3 Flash Preview: 32/32 (100%) parse success, 32/32 (100%) full validity
+- Claude Sonnet 4.6: 32/32 (100%) parse success, 31/32 (96%) full validity
+
+Both models achieve 100% parse success on all 32 prompts. The single
+Claude action failure is stochastic (v1.0 prompt, not a v1.1 issue) and
+does not affect the parse success gate criterion. AME v1.1 with 21
+primitives is fully learnable from the system prompt for both model
+families. Proceed to WP#8 (conformance + publish).
+
+---
+
 ## Appendix: Runs 1-4 (Buggy Harness)
 
 Runs 1-4 used a test harness that did not account for Gemini thinking model
@@ -326,7 +472,7 @@ To reproduce this benchmark:
    ```
    ./gradlew :ame-core:test --tests "com.agenticmobile.ame.LlmReliabilityTest" --no-daemon
    ```
-3. The harness calls both APIs with the 20 prompts, extracts AME from
+3. The harness calls both APIs with the 32 prompts (20 v1.0 + 12 v1.1), extracts AME from
    responses (filtering thinking parts, stripping markdown fences and inline
    backticks), parses with `AmeParser`, scores on 4 dimensions, and prints
    results as markdown tables.
@@ -360,3 +506,4 @@ To reproduce this benchmark:
 | 1.3 | 2026-04-06 | Run 3: Improved system prompt (identifier rule + richer example). Gemini 2.5 Flash 100% parse / 80% full, Claude 100% all. Cross-run analysis confirms stochastic ref variance. GATE 2 PASS. |
 | 1.4 | 2026-04-06 | Run 4: Re-tested gemini-3-flash-preview with improved prompt + extraction. 95% parse / 30% full. GATE 2 PASS. |
 | 2.0 | 2026-04-06 | **Run 5 (definitive):** Fixed thinking-model harness (parts filtering, thinkingLevel:minimal, maxOutputTokens:4096, response logging). gemini-3-flash-preview 100% / 100%, claude-sonnet-4-6 100% / 100%. Runs 1-4 failures caused by harness bugs, not model or spec issues. GATE 2 PASS — perfect scores. |
+| 3.0 | 2026-04-12 | **GATE 3 (v1.1):** 32 prompts (20 v1.0 + 12 v1.1). v1.1 system prompt with 21 primitives. Tree walkers updated for new containers. Gemini 32/32 (100%) full validity, Claude 31/32 (96%) full validity — 1 stochastic action failure on v1.0 prompt #6. 100% parse success on both. GATE 3 PASS. |

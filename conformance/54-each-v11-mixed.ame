@@ -1,0 +1,13 @@
+// conformance/54-each-v11-mixed.ame
+// Tests: each() producing callout nodes from data
+root = col([title, alerts])
+title = txt("System Alerts", headline)
+alerts = each($alerts, alert_tpl)
+alert_tpl = callout(warning, "$message")
+---
+{
+  "alerts": [
+    {"message": "Battery low"},
+    {"message": "Update available"}
+  ]
+}

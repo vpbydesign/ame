@@ -1,0 +1,5 @@
+// conformance/26-accordion-nested.ame
+// Tests: accordion nested inside accordion
+root = accordion("Outer", [inner])
+inner = accordion("Inner", [leaf])
+leaf = txt("Nested content", body)

@@ -1,0 +1,7 @@
+// conformance/39-timeline-all-statuses.ame
+// Tests: timeline with all four status values
+root = timeline([s1, s2, s3, s4])
+s1 = timeline_item("Completed", "All done", done)
+s2 = timeline_item("In Progress", "Working on it", active)
+s3 = timeline_item("Upcoming", "Not started", pending)
+s4 = timeline_item("Failed", "Something went wrong", error)

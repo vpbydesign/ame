@@ -1,0 +1,9 @@
+// conformance/51-carousel-cards.ame
+// Tests: carousel containing cards
+root = carousel([c1, c2])
+c1 = card([t1, d1])
+t1 = txt("Plan A", headline)
+d1 = txt("Basic features included.", body)
+c2 = card([t2, d2])
+t2 = txt("Plan B", headline)
+d2 = txt("All features included.", body)

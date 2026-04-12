@@ -1,0 +1,3 @@
+// conformance/14-chart-line.ame
+// Tests: line chart with values and labels
+root = chart(line, values=[3.2,7.1,4.5,9.8], labels=["Q1","Q2","Q3","Q4"])

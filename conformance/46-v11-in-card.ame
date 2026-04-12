@@ -1,0 +1,6 @@
+// conformance/46-v11-in-card.ame
+// Tests: v1.1 primitives nested inside card
+root = card([header, the_chart, note])
+header = txt("Monthly Sales", headline)
+the_chart = chart(bar, values=[12.5,18.3,22.7], labels=["Oct","Nov","Dec"])
+note = callout(info, "Sales increased 15% this quarter.")

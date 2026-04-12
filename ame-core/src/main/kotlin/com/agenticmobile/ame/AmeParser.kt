@@ -273,6 +273,13 @@ class AmeParser {
             "list" -> buildList(positional, named)
             "table" -> buildTable(positional, named)
             "each" -> buildEach(positional, named)
+            "chart" -> buildChart(positional, named)
+            "code" -> buildCode(positional, named)
+            "accordion" -> buildAccordion(positional, named)
+            "carousel" -> buildCarousel(positional, named)
+            "callout" -> buildCallout(positional, named)
+            "timeline" -> buildTimeline(positional, named)
+            "timeline_item" -> buildTimelineItem(positional, named)
             else -> {
                 _warnings.add("Unknown component '$name'")
                 AmeNode.Txt("\u26A0 Unknown: $name", TxtStyle.CAPTION)
@@ -322,7 +329,8 @@ class AmeParser {
         val text = resolveStringArg(pos.getOrNull(0))
         val style = resolveTxtStyleArg(pos.getOrNull(1)) ?: TxtStyle.BODY
         val maxLines = named["max_lines"]?.let { resolveIntArg(it) }
-        return AmeNode.Txt(text = text, style = style, maxLines = maxLines)
+        val color = named["color"]?.let { resolveSemanticColorArg(it) }
+        return AmeNode.Txt(text = text, style = style, maxLines = maxLines, color = color)
     }
 
     private fun buildImg(pos: List<ParsedValue>, named: Map<String, ParsedValue>): AmeNode.Img {
@@ -351,7 +359,8 @@ class AmeParser {
     private fun buildBadge(pos: List<ParsedValue>, named: Map<String, ParsedValue>): AmeNode.Badge {
         val label = resolveStringArg(pos.getOrNull(0))
         val variant = pos.getOrNull(1)?.let { resolveBadgeVariantArg(it) } ?: BadgeVariant.DEFAULT
-        return AmeNode.Badge(label = label, variant = variant)
+        val color = named["color"]?.let { resolveSemanticColorArg(it) }
+        return AmeNode.Badge(label = label, variant = variant, color = color)
     }
 
     private fun buildProgress(pos: List<ParsedValue>, named: Map<String, ParsedValue>): AmeNode.Progress {
@@ -410,6 +419,85 @@ class AmeParser {
             else -> ""
         }
         return AmeNode.Each(dataPath = dataPath, templateId = templateId)
+    }
+
+    private fun buildChart(pos: List<ParsedValue>, named: Map<String, ParsedValue>): AmeNode.Chart {
+        val type = pos.getOrNull(0)?.let { resolveChartTypeArg(it) } ?: ChartType.BAR
+
+        var values: List<Double>? = null
+        var valuesPath: String? = null
+        val valuesArg = named["values"] ?: pos.getOrNull(1)
+        when (valuesArg) {
+            is ParsedValue.DataRef -> valuesPath = valuesArg.path
+            is ParsedValue.Arr -> values = resolveDoubleListArg(valuesArg)
+            else -> {}
+        }
+
+        var labels: List<String>? = null
+        var labelsPath: String? = null
+        val labelsArg = named["labels"]
+        when (labelsArg) {
+            is ParsedValue.DataRef -> labelsPath = labelsArg.path
+            is ParsedValue.Arr -> labels = resolveStringListArg(labelsArg)
+            else -> {}
+        }
+
+        var series: List<List<Double>>? = null
+        var seriesPath: String? = null
+        val seriesArg = named["series"]
+        when (seriesArg) {
+            is ParsedValue.DataRef -> seriesPath = seriesArg.path
+            is ParsedValue.Arr -> series = resolveNestedDoubleListArg(seriesArg)
+            else -> {}
+        }
+
+        val height = named["height"]?.let { resolveIntArg(it) } ?: 200
+        val color = named["color"]?.let { resolveSemanticColorArg(it) }
+
+        return AmeNode.Chart(
+            type = type, values = values, labels = labels, series = series,
+            height = height, color = color,
+            valuesPath = valuesPath, labelsPath = labelsPath, seriesPath = seriesPath
+        )
+    }
+
+    private fun buildCode(pos: List<ParsedValue>, named: Map<String, ParsedValue>): AmeNode.Code {
+        val language = resolveStringArg(pos.getOrNull(0))
+        val content = resolveStringArg(pos.getOrNull(1))
+        val title = pos.getOrNull(2)?.let { resolveStringArgNullable(it) }
+        return AmeNode.Code(language = language, content = content, title = title)
+    }
+
+    private fun buildAccordion(pos: List<ParsedValue>, named: Map<String, ParsedValue>): AmeNode.Accordion {
+        val title = resolveStringArg(pos.getOrNull(0))
+        val children = resolveChildrenArg(pos.getOrNull(1))
+        val expanded = pos.getOrNull(2)?.let { resolveBoolArg(it) } ?: false
+        return AmeNode.Accordion(title = title, children = children, expanded = expanded)
+    }
+
+    private fun buildCarousel(pos: List<ParsedValue>, named: Map<String, ParsedValue>): AmeNode.Carousel {
+        val children = resolveChildrenArg(pos.getOrNull(0))
+        val peek = named["peek"]?.let { resolveIntArg(it) } ?: 24
+        return AmeNode.Carousel(children = children, peek = peek)
+    }
+
+    private fun buildCallout(pos: List<ParsedValue>, named: Map<String, ParsedValue>): AmeNode.Callout {
+        val type = pos.getOrNull(0)?.let { resolveCalloutTypeArg(it) } ?: CalloutType.INFO
+        val content = resolveStringArg(pos.getOrNull(1))
+        val title = pos.getOrNull(2)?.let { resolveStringArgNullable(it) }
+        return AmeNode.Callout(type = type, content = content, title = title)
+    }
+
+    private fun buildTimeline(pos: List<ParsedValue>, named: Map<String, ParsedValue>): AmeNode.Timeline {
+        val children = resolveChildrenArg(pos.getOrNull(0))
+        return AmeNode.Timeline(children = children)
+    }
+
+    private fun buildTimelineItem(pos: List<ParsedValue>, named: Map<String, ParsedValue>): AmeNode.TimelineItem {
+        val title = resolveStringArg(pos.getOrNull(0))
+        val subtitle = pos.getOrNull(1)?.let { resolveStringArgNullable(it) }
+        val status = pos.getOrNull(2)?.let { resolveTimelineStatusArg(it) } ?: TimelineStatus.PENDING
+        return AmeNode.TimelineItem(title = title, subtitle = subtitle, status = status)
     }
 
     // ── Action Call Dispatch ───────────────────────────────────────────
@@ -602,6 +690,42 @@ class AmeParser {
         }
     }
 
+    private fun resolveChartTypeArg(arg: ParsedValue?): ChartType? {
+        if (arg == null) return null
+        return when (arg) {
+            is ParsedValue.Ident -> AmeKeywords.parseChartType(arg.name)
+            is ParsedValue.Str -> AmeKeywords.parseChartType(arg.value)
+            else -> null
+        }
+    }
+
+    private fun resolveCalloutTypeArg(arg: ParsedValue?): CalloutType? {
+        if (arg == null) return null
+        return when (arg) {
+            is ParsedValue.Ident -> AmeKeywords.parseCalloutType(arg.name)
+            is ParsedValue.Str -> AmeKeywords.parseCalloutType(arg.value)
+            else -> null
+        }
+    }
+
+    private fun resolveTimelineStatusArg(arg: ParsedValue?): TimelineStatus? {
+        if (arg == null) return null
+        return when (arg) {
+            is ParsedValue.Ident -> AmeKeywords.parseTimelineStatus(arg.name)
+            is ParsedValue.Str -> AmeKeywords.parseTimelineStatus(arg.value)
+            else -> null
+        }
+    }
+
+    private fun resolveSemanticColorArg(arg: ParsedValue?): SemanticColor? {
+        if (arg == null) return null
+        return when (arg) {
+            is ParsedValue.Ident -> AmeKeywords.parseSemanticColor(arg.name)
+            is ParsedValue.Str -> AmeKeywords.parseSemanticColor(arg.value)
+            else -> null
+        }
+    }
+
     private fun resolveActionArg(arg: ParsedValue?): AmeAction? {
         if (arg == null) return null
         return when (arg) {
@@ -640,6 +764,32 @@ class AmeParser {
                 }
             }
             else -> emptyList()
+        }
+    }
+
+    private fun resolveDoubleListArg(arg: ParsedValue?): List<Double>? {
+        if (arg == null) return null
+        return when (arg) {
+            is ParsedValue.Arr -> arg.items.mapNotNull { item ->
+                item.trim().toDoubleOrNull()
+            }
+            else -> null
+        }
+    }
+
+    private fun resolveNestedDoubleListArg(arg: ParsedValue?): List<List<Double>>? {
+        if (arg == null) return null
+        return when (arg) {
+            is ParsedValue.Arr -> arg.items.mapNotNull { rowStr ->
+                val rowParsed = parseArgValue(rowStr.trim())
+                when (rowParsed) {
+                    is ParsedValue.Arr -> rowParsed.items.mapNotNull { cellStr ->
+                        cellStr.trim().toDoubleOrNull()
+                    }
+                    else -> null
+                }
+            }
+            else -> null
         }
     }
 
@@ -938,6 +1088,34 @@ class AmeParser {
             is AmeNode.Progress -> if (scope != null && node.label != null) node.copy(label = resolvePathInScope(node.label, scope)) else node
             is AmeNode.Btn -> if (scope != null) node.copy(label = resolvePathInScope(node.label, scope)) else node
             is AmeNode.Icon -> if (scope != null) node.copy(name = resolvePathInScope(node.name, scope)) else node
+            is AmeNode.Accordion -> node.copy(
+                children = resolveChildren(node.children, scope),
+                title = if (scope != null) resolvePathInScope(node.title, scope) else node.title
+            )
+            is AmeNode.Carousel -> node.copy(children = resolveChildren(node.children, scope))
+            is AmeNode.Timeline -> node.copy(children = resolveChildren(node.children, scope))
+            is AmeNode.Callout -> if (scope != null) node.copy(
+                content = resolvePathInScope(node.content, scope),
+                title = node.title?.let { resolvePathInScope(it, scope) }
+            ) else node
+            is AmeNode.Code -> if (scope != null) node.copy(
+                content = resolvePathInScope(node.content, scope),
+                title = node.title?.let { resolvePathInScope(it, scope) }
+            ) else node
+            is AmeNode.TimelineItem -> if (scope != null) node.copy(
+                title = resolvePathInScope(node.title, scope),
+                subtitle = node.subtitle?.let { resolvePathInScope(it, scope) }
+            ) else node
+            is AmeNode.Chart -> if (scope != null) {
+                node.copy(
+                    values = node.values ?: node.valuesPath?.let { resolveDoubleArrayInScope(it, scope) },
+                    labels = node.labels ?: node.labelsPath?.let { resolveStringArrayInScope(it, scope) },
+                    series = node.series ?: node.seriesPath?.let { resolveNestedDoubleArrayInScope(it, scope) },
+                    valuesPath = null,
+                    labelsPath = null,
+                    seriesPath = null
+                )
+            } else node
             else -> node
         }
     }
@@ -1010,6 +1188,50 @@ class AmeParser {
             is JsonPrimitive -> current.contentOrNull ?: ""
             is JsonNull -> ""
             else -> ""
+        }
+    }
+
+    // ── Chart Array Resolution Helpers ─────────────────────────────────
+
+    private fun resolveDoubleArrayInScope(path: String, scope: JsonObject): List<Double>? {
+        val segments = path.removePrefix("$").split("/")
+        var current: JsonElement = scope
+        for (segment in segments) {
+            when (current) {
+                is JsonObject -> current = current[segment] ?: return null
+                else -> return null
+            }
+        }
+        return (current as? JsonArray)?.mapNotNull {
+            (it as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()
+        }
+    }
+
+    private fun resolveStringArrayInScope(path: String, scope: JsonObject): List<String>? {
+        val segments = path.removePrefix("$").split("/")
+        var current: JsonElement = scope
+        for (segment in segments) {
+            when (current) {
+                is JsonObject -> current = current[segment] ?: return null
+                else -> return null
+            }
+        }
+        return (current as? JsonArray)?.mapNotNull {
+            (it as? JsonPrimitive)?.contentOrNull
+        }
+    }
+
+    private fun resolveNestedDoubleArrayInScope(path: String, scope: JsonObject): List<List<Double>>? {
+        val segments = path.removePrefix("$").split("/")
+        var current: JsonElement = scope
+        for (segment in segments) {
+            when (current) {
+                is JsonObject -> current = current[segment] ?: return null
+                else -> return null
+            }
+        }
+        return (current as? JsonArray)?.mapNotNull { inner ->
+            (inner as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull() }
         }
     }
 

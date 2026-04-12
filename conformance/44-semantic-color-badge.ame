@@ -1,0 +1,6 @@
+// conformance/44-semantic-color-badge.ame
+// Tests: badge with semantic color override
+root = row([b1, b2, b3])
+b1 = badge("Active", filled, color=success)
+b2 = badge("Pending", outlined, color=warning)
+b3 = badge("Failed", filled, color=error)

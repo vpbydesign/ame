@@ -1,0 +1,3 @@
+// conformance/22-code-with-title.ame
+// Tests: code block with language, content, and title
+root = code("yaml", "server:\n  port: 8080", "config.yml")

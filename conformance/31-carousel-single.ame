@@ -1,0 +1,5 @@
+// conformance/31-carousel-single.ame
+// Tests: carousel with single child (edge case)
+root = carousel([only])
+only = card([label])
+label = txt("Single card", body)

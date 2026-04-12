@@ -1,0 +1,4 @@
+// conformance/25-accordion-expanded.ame
+// Tests: accordion with expanded=true
+root = accordion("Details", [d1], true)
+d1 = txt("This is expanded by default", body)

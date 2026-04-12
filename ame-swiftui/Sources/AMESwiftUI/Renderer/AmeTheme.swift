@@ -52,4 +52,87 @@ public struct AmeTheme {
         case .info:    return Color.blue
         }
     }
+
+    // MARK: - Callout Style Mapping
+
+    /// Maps CalloutType to an SF Symbol name for the callout icon.
+    public static func calloutIcon(_ type: CalloutType) -> String {
+        switch type {
+        case .info:    return "info.circle"
+        case .warning: return "exclamationmark.triangle"
+        case .error:   return "xmark.circle"
+        case .success: return "checkmark.circle"
+        case .tip:     return "lightbulb"
+        }
+    }
+
+    /// Maps CalloutType to a foreground tint color.
+    public static func calloutTint(_ type: CalloutType) -> Color {
+        switch type {
+        case .info:    return .blue
+        case .warning: return .orange
+        case .error:   return .red
+        case .success: return .green
+        case .tip:     return .purple
+        }
+    }
+
+    /// Maps CalloutType to a subtle background fill color.
+    public static func calloutBackground(_ type: CalloutType) -> Color {
+        calloutTint(type).opacity(0.1)
+    }
+
+    // MARK: - Timeline Style Mapping
+
+    /// Maps TimelineStatus to a circle fill color.
+    public static func timelineCircleColor(_ status: TimelineStatus) -> Color {
+        switch status {
+        case .done:    return .accentColor
+        case .active:  return .accentColor
+        #if os(iOS)
+        case .pending: return Color(.systemGray3)
+        #else
+        case .pending: return Color.gray.opacity(0.4)
+        #endif
+        case .error:   return .red
+        }
+    }
+
+    /// Maps TimelineStatus to a connector line color.
+    public static func timelineLineColor(_ status: TimelineStatus) -> Color {
+        switch status {
+        case .done:    return .accentColor
+        #if os(iOS)
+        case .active:  return Color(.systemGray3)
+        case .pending: return Color(.systemGray3)
+        #else
+        case .active:  return Color.gray.opacity(0.4)
+        case .pending: return Color.gray.opacity(0.4)
+        #endif
+        case .error:   return .red
+        }
+    }
+
+    /// Whether the connector line after this status should be dashed.
+    public static func timelineIsDashed(_ status: TimelineStatus) -> Bool {
+        switch status {
+        case .done:    return false
+        case .active:  return true
+        case .pending: return true
+        case .error:   return false
+        }
+    }
+
+    // MARK: - Semantic Color Mapping
+
+    /// Maps SemanticColor to a platform-appropriate SwiftUI color.
+    public static func semanticColor(_ color: SemanticColor) -> Color {
+        switch color {
+        case .primary:   return .accentColor
+        case .secondary: return .secondary
+        case .error:     return .red
+        case .success:   return .green
+        case .warning:   return .orange
+        }
+    }
 }

@@ -1,0 +1,3 @@
+// conformance/37-callout-with-title.ame
+// Tests: callout with optional title
+root = callout(tip, "Use keyboard shortcuts for faster navigation.", "Pro Tip")

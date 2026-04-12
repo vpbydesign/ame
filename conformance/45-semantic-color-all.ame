@@ -1,0 +1,8 @@
+// conformance/45-semantic-color-all.ame
+// Tests: all five semantic colors on txt
+root = col([t1, t2, t3, t4, t5])
+t1 = txt("Primary", body, color=primary)
+t2 = txt("Secondary", body, color=secondary)
+t3 = txt("Error", body, color=error)
+t4 = txt("Success", body, color=success)
+t5 = txt("Warning", body, color=warning)

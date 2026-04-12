@@ -1,0 +1,1 @@
+{"_type":"col","children":[{"_type":"txt","style":"headline","text":"Department Scores"},{"_type":"col","children":[{"_type":"chart","labels":["Q1","Q2","Q3"],"type":"bar","values":[85.5,90.2,78.3]},{"_type":"chart","labels":["Q1","Q2","Q3"],"type":"bar","values":[92.1,88.4,95.7]}]}]}

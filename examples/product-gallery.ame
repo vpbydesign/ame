@@ -1,0 +1,28 @@
+// product-gallery.ame
+// Scenario: Product page with image carousel, colored badges, size chart, and buy button
+// Lines: 22 | Tokens: 436 (measured via Gemini gemini-2.0-flash)
+// v1.1 primitives: carousel, chart, accordion, semantic color on badge
+//
+root = col([prod_title, gallery, price_row, specs, size_chart, buy_btn])
+prod_title = txt("Nike Air Max 90", headline)
+gallery = carousel([img1, img2, img3])
+img1 = img("https://example.com/airmax-side.jpg", 280)
+img2 = img("https://example.com/airmax-top.jpg", 280)
+img3 = img("https://example.com/airmax-sole.jpg", 280)
+price_row = row([price, discount_badge, stock_badge], 8)
+price = txt("$129.99", title)
+discount_badge = badge("20% OFF", filled, color=success)
+stock_badge = badge("In Stock", outlined, color=primary)
+specs = accordion("Specifications", [spec_list])
+spec_list = col([s1, s2, s3])
+s1 = row([s1k, s1v], space_between)
+s1k = txt("Material", caption)
+s1v = txt("Leather/Mesh", body)
+s2 = row([s2k, s2v], space_between)
+s2k = txt("Weight", caption)
+s2v = txt("312g", body)
+s3 = row([s3k, s3v], space_between)
+s3k = txt("Cushioning", caption)
+s3v = txt("Air Max unit", body)
+size_chart = chart(bar, values=[12,45,38,28,15], labels=["8","9","10","11","12"], height=120, color=primary)
+buy_btn = btn("Add to Cart", tool(add_to_cart, product="airmax90", size="10"), primary)

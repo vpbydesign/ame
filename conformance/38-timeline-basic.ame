@@ -1,0 +1,5 @@
+// conformance/38-timeline-basic.ame
+// Tests: basic timeline with two items
+root = timeline([s1, s2])
+s1 = timeline_item("Order Placed", "Confirmed at 2:30 PM", done)
+s2 = timeline_item("Shipping", "Estimated 3-5 days", active)

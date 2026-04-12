@@ -22,11 +22,11 @@ import java.time.format.DateTimeFormatter
 import kotlin.test.Test
 
 /**
- * GATE 2: LLM Reliability Benchmark
+ * GATE 3: LLM Reliability Benchmark (v1.1 — 21 Primitives)
  *
- * Calls Gemini and Claude APIs with the standard AME system prompt from
+ * Calls Gemini and Claude APIs with the v1.1 AME system prompt from
  * integration.md, feeds responses to AmeParser, and scores on 4 dimensions
- * (parse, structure, refs, actions).
+ * (parse, structure, refs, actions). 32 prompts: 20 v1.0 + 12 v1.1.
  *
  * NOT a pass/fail test. This benchmark MEASURES success rates and prints
  * results as markdown tables for llm-reliability.md.
@@ -47,15 +47,15 @@ class LlmReliabilityTest {
         File("build/benchmark-logs/$timestamp").also { it.mkdirs() }
     }
 
-    // Exact system prompt from specification/v1.0/integration.md lines 126-164
+    // Exact v1.1 system prompt from specification/v1.0/integration.md lines 128-176
     private val systemPrompt = """
 --- AME UI Generation ---
-When you want to show rich interactive UI (cards, forms, lists, buttons),
-generate an AME document. AME is a line-oriented syntax where each line
-binds an identifier to a component.
+When you want to show rich interactive UI (cards, forms, lists, buttons,
+charts, timelines), generate an AME document. AME is a line-oriented syntax
+where each line binds an identifier to a component.
 
-AME_SUPPORT: v1.0
-AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress
+AME_SUPPORT: v1.1
+AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress, chart, code, accordion, carousel, callout, timeline
 
 Rules:
 - One statement per line: identifier = Component(args)
@@ -65,14 +65,21 @@ Rules:
 - IMPORTANT: Every identifier in a children array MUST be defined on its own line
 
 Primitives:
-col([children]) row([children], align?) txt("text", style?) btn("label", action, style?)
-card([children]) badge("label", variant?) icon("name") img("url", height?)
+col([children]) row([children], align?) txt("text", style?, color?) btn("label", action, style?)
+card([children]) badge("label", variant?, color?) icon("name") img("url", height?)
 input(id, "label", type?) toggle(id, "label") list([children]) table(headers, rows)
 divider() spacer(height?) progress(value, "label"?)
+chart(type, values, labels?, height?) — data visualization. type: line|bar|pie|sparkline
+code(lang, content, title?) — syntax-highlighted code block with copy
+accordion(title, [children], expanded?) — collapsible section
+carousel([children], peek?) — horizontal scrollable container
+callout(type, content, title?) — alert/info box. type: info|warning|error|success|tip
+timeline([items]) — ordered event sequence. Items: timeline_item(title, subtitle?, status?)
 
 Styles: display, headline, title, body, caption, mono, label
 Button styles: primary, secondary, outline, text, destructive
 Badge variants: default, success, warning, error, info
+Semantic colors (named arg color=): primary, secondary, error, success, warning
 
 Actions:
 tool(name, key=val)  - invoke a tool
@@ -114,7 +121,20 @@ share_btn = btn("Share", copy("San Francisco: 62°F, Partly Cloudy"), text)
         "Display a notification list with 4 items of varying types",
         "Show a flight result: NYC to LAX, \$299, 5h 30m, with book button",
         "Create a simple about page with app name, version, and support link",
-        "Show a recipe card: title, prep time, cook time, ingredients list"
+        "Show a recipe card: title, prep time, cook time, ingredients list",
+        // v1.1 prompts (21-32)
+        "Show a bar chart of monthly spending: Jan \$420, Feb \$580, Mar \$510, Apr \$670",
+        "Display this Python code with syntax highlighting: def hello():\\n    print('Hello, World!')",
+        "Show medication details with expandable sections for side effects and drug interactions",
+        "Show a horizontal carousel of 4 running shoes with images, names, prices, and add-to-cart buttons",
+        "Show a warning callout: Do not take ibuprofen on an empty stomach",
+        "Show order tracking for Order #4521: Ordered (done), Shipped (done), In Transit (active), Delivered (pending)",
+        "Show a sparkline chart of Bitcoin prices next to the current price of \$67,432",
+        "Create a dashboard with a line chart of revenue, a success callout about hitting targets, and a summary stat",
+        "Show a Kotlin code snippet with a tip callout about best practices below it",
+        "Show an FAQ with 3 expandable questions about AME: What is it, How many primitives, Is it open source",
+        "Show search results for 'italian restaurants' with name, rating, and address for each result using a data section",
+        "Display a list of 3 upcoming calendar events with title, date, and location from a data section"
     )
 
     private val promptLabels = listOf(
@@ -122,7 +142,11 @@ share_btn = btn("Share", copy("San Francisco: 62°F, Partly Cloudy"), text)
         "To-do list", "Music player", "Plan comparison", "Email preview",
         "Progress card", "Settings toggles", "Shipping form", "Coffee shop search",
         "Calendar event", "Product card", "Error card", "User profile",
-        "Notification list", "Flight result", "About page", "Recipe card"
+        "Notification list", "Flight result", "About page", "Recipe card",
+        // v1.1 labels (21-32)
+        "Chart bar spending", "Code Python", "Accordion medication", "Carousel shoes",
+        "Callout warning", "Timeline order", "Chart sparkline BTC", "Dashboard chart+callout",
+        "Code+callout combo", "Accordion FAQ", "Each restaurants", "Each events"
     )
 
     data class TestResult(
@@ -188,7 +212,7 @@ share_btn = btn("Share", copy("San Francisco: 62°F, Partly Cloudy"), text)
         for (i in testPrompts.indices) {
             val prompt = testPrompts[i]
             val label = promptLabels[i]
-            println("  [${i + 1}/20] $label ...")
+            println("  [${i + 1}/${testPrompts.size}] $label ...")
 
             val rawResponse = try {
                 when (model) {
@@ -505,6 +529,9 @@ share_btn = btn("Share", copy("San Francisco: 62°F, Partly Cloudy"), text)
         is AmeNode.Row -> node.children.any { hasUnresolvedRefs(it) }
         is AmeNode.Card -> node.children.any { hasUnresolvedRefs(it) }
         is AmeNode.DataList -> node.children.any { hasUnresolvedRefs(it) }
+        is AmeNode.Accordion -> node.children.any { hasUnresolvedRefs(it) }
+        is AmeNode.Carousel -> node.children.any { hasUnresolvedRefs(it) }
+        is AmeNode.Timeline -> node.children.any { hasUnresolvedRefs(it) }
         else -> false
     }
 
@@ -518,6 +545,9 @@ share_btn = btn("Share", copy("San Francisco: 62°F, Partly Cloudy"), text)
         is AmeNode.Row -> node.children.all { validateActions(it) }
         is AmeNode.Card -> node.children.all { validateActions(it) }
         is AmeNode.DataList -> node.children.all { validateActions(it) }
+        is AmeNode.Accordion -> node.children.all { validateActions(it) }
+        is AmeNode.Carousel -> node.children.all { validateActions(it) }
+        is AmeNode.Timeline -> node.children.all { validateActions(it) }
         else -> true
     }
 
@@ -617,15 +647,32 @@ share_btn = btn("Share", copy("San Francisco: 62°F, Partly Cloudy"), text)
         val gPct = gParse * 100 / gTotal
         val cPct = cParse * 100 / cTotal
 
-        val gate2 = when {
-            gPct >= 85 && cPct >= 85 -> "PASS"
-            (gPct >= 85 && cPct >= 70) || (cPct >= 85 && gPct >= 70) -> "CONDITIONAL"
-            gPct >= 70 && cPct >= 70 -> "CONDITIONAL"
+        fun fullCount(results: List<TestResult>): Int =
+            results.count { it.parseSuccess && it.structureValid && it.refsConsistent && it.actionsValid }
+
+        val gV10Full = fullCount(geminiResults.take(20))
+        val cV10Full = fullCount(claudeResults.take(20))
+        val gV11Full = fullCount(geminiResults.drop(20))
+        val cV11Full = fullCount(claudeResults.drop(20))
+
+        println()
+        println("v1.0 vs v1.1 Breakdown:")
+        println("  v1.0 prompts (1-20):  Gemini $gV10Full/20, Claude $cV10Full/20")
+        println("  v1.1 prompts (21-32): Gemini $gV11Full/12, Claude $cV11Full/12")
+
+        val v10Regression = gV10Full < 20 || cV10Full < 20
+        if (v10Regression) {
+            println("  WARNING: v1.0 prompt regression detected! Was 20/20 in GATE 2.")
+        }
+
+        val gate3 = when {
+            gPct >= 95 && cPct >= 95 -> "PASS"
+            gPct >= 85 && cPct >= 85 -> "CONDITIONAL"
             else -> "FAIL"
         }
 
         println()
-        println("GATE 2 Result: $gate2")
+        println("GATE 3 Result: $gate3")
         println("  Gemini ($GEMINI_MODEL): $gParse/$gTotal ($gPct%) parse success, $gFull/$gTotal full validity")
         println("  Claude ($CLAUDE_MODEL): $cParse/$cTotal ($cPct%) parse success, $cFull/$cTotal full validity")
     }

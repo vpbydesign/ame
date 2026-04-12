@@ -62,6 +62,44 @@ enum class InputType {
     @SerialName("select") SELECT
 }
 
+/** Chart visualization type. */
+@Serializable
+enum class ChartType {
+    @SerialName("line") LINE,
+    @SerialName("bar") BAR,
+    @SerialName("pie") PIE,
+    @SerialName("sparkline") SPARKLINE
+}
+
+/** Callout alert type — determines icon and background tint. */
+@Serializable
+enum class CalloutType {
+    @SerialName("info") INFO,
+    @SerialName("warning") WARNING,
+    @SerialName("error") ERROR,
+    @SerialName("success") SUCCESS,
+    @SerialName("tip") TIP
+}
+
+/** Timeline step status — determines circle style and connector line. */
+@Serializable
+enum class TimelineStatus {
+    @SerialName("done") DONE,
+    @SerialName("active") ACTIVE,
+    @SerialName("pending") PENDING,
+    @SerialName("error") ERROR
+}
+
+/** Semantic color token for platform-consistent coloring. */
+@Serializable
+enum class SemanticColor {
+    @SerialName("primary") PRIMARY,
+    @SerialName("secondary") SECONDARY,
+    @SerialName("error") ERROR,
+    @SerialName("success") SUCCESS,
+    @SerialName("warning") WARNING
+}
+
 /**
  * Reserved keywords and parser lookup utilities.
  * All sets match the Reserved Keywords section of syntax.md exactly.
@@ -69,7 +107,8 @@ enum class InputType {
 object AmeKeywords {
     val STANDARD_PRIMITIVES: Set<String> = setOf(
         "col", "row", "txt", "btn", "card", "badge", "icon", "img",
-        "input", "toggle", "list", "table", "divider", "spacer", "progress"
+        "input", "toggle", "list", "table", "divider", "spacer", "progress",
+        "chart", "code", "accordion", "carousel", "callout", "timeline", "timeline_item"
     )
 
     val ACTION_NAMES: Set<String> = setOf("tool", "uri", "nav", "copy", "submit")
@@ -100,4 +139,16 @@ object AmeKeywords {
 
     fun parseInputType(value: String): InputType? =
         InputType.entries.find { it.name.equals(value, ignoreCase = true) }
+
+    fun parseChartType(value: String): ChartType? =
+        ChartType.entries.find { it.name.equals(value, ignoreCase = true) }
+
+    fun parseCalloutType(value: String): CalloutType? =
+        CalloutType.entries.find { it.name.equals(value, ignoreCase = true) }
+
+    fun parseTimelineStatus(value: String): TimelineStatus? =
+        TimelineStatus.entries.find { it.name.equals(value, ignoreCase = true) }
+
+    fun parseSemanticColor(value: String): SemanticColor? =
+        SemanticColor.entries.find { it.name.equals(value, ignoreCase = true) }
 }

@@ -277,6 +277,13 @@ public final class AmeParser {
         case "list": return buildList(positional, named)
         case "table": return buildTable(positional, named)
         case "each": return buildEach(positional, named)
+        case "chart": return buildChart(positional, named)
+        case "code": return buildCode(positional, named)
+        case "accordion": return buildAccordion(positional, named)
+        case "carousel": return buildCarousel(positional, named)
+        case "callout": return buildCallout(positional, named)
+        case "timeline": return buildTimeline(positional, named)
+        case "timeline_item": return buildTimelineItem(positional, named)
         default:
             _warnings.append("Unknown component '\(name)'")
             return .txt(text: "\u{26A0} Unknown: \(name)", style: .caption)
@@ -331,7 +338,8 @@ public final class AmeParser {
         let text = resolveStringArg(pos.first)
         let style = resolveTxtStyleArg(pos.safeGet(1)) ?? .body
         let maxLines = named["max_lines"].flatMap { resolveIntArg($0) }
-        return .txt(text: text, style: style, maxLines: maxLines)
+        let color: SemanticColor? = named["color"].flatMap { resolveSemanticColorArg($0) }
+        return .txt(text: text, style: style, maxLines: maxLines, color: color)
     }
 
     private func buildImg(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
@@ -360,7 +368,8 @@ public final class AmeParser {
     private func buildBadge(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
         let label = resolveStringArg(pos.first)
         let variant = pos.safeGet(1).flatMap { resolveBadgeVariantArg($0) } ?? .default
-        return .badge(label: label, variant: variant)
+        let color: SemanticColor? = named["color"].flatMap { resolveSemanticColorArg($0) }
+        return .badge(label: label, variant: variant, color: color)
     }
 
     private func buildProgress(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
@@ -422,6 +431,88 @@ public final class AmeParser {
         }
 
         return .each(dataPath: dataPath, templateId: templateId)
+    }
+
+    // MARK: - v1.1 Builder Functions
+
+    private func buildChart(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
+        let type = pos.first.flatMap { resolveChartTypeArg($0) } ?? .bar
+
+        var values: [Double]? = nil
+        var valuesPath: String? = nil
+        if let valuesArg = named["values"] ?? pos.safeGet(1) {
+            switch valuesArg {
+            case .dataRef(let path): valuesPath = path
+            case .arr: values = resolveDoubleListArg(valuesArg)
+            default: break
+            }
+        }
+
+        var labels: [String]? = nil
+        var labelsPath: String? = nil
+        if let labelsArg = named["labels"] {
+            switch labelsArg {
+            case .dataRef(let path): labelsPath = path
+            case .arr: labels = resolveStringListArg(labelsArg)
+            default: break
+            }
+        }
+
+        var series: [[Double]]? = nil
+        var seriesPath: String? = nil
+        if let seriesArg = named["series"] {
+            switch seriesArg {
+            case .dataRef(let path): seriesPath = path
+            case .arr: series = resolveNestedDoubleListArg(seriesArg)
+            default: break
+            }
+        }
+
+        let height = named["height"].flatMap { resolveIntArg($0) } ?? 200
+        let color: SemanticColor? = named["color"].flatMap { resolveSemanticColorArg($0) }
+
+        return .chart(type: type, values: values, labels: labels, series: series,
+                      height: height, color: color,
+                      valuesPath: valuesPath, labelsPath: labelsPath, seriesPath: seriesPath)
+    }
+
+    private func buildCode(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
+        let language = resolveStringArg(pos.first)
+        let content = resolveStringArg(pos.safeGet(1))
+        let title = pos.safeGet(2).flatMap { resolveStringArgNullable($0) }
+        return .code(language: language, content: content, title: title)
+    }
+
+    private func buildAccordion(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
+        let title = resolveStringArg(pos.first)
+        let children = resolveChildrenArg(pos.safeGet(1))
+        let expanded = pos.safeGet(2).map { resolveBoolArg($0) } ?? false
+        return .accordion(title: title, children: children, expanded: expanded)
+    }
+
+    private func buildCarousel(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
+        let children = resolveChildrenArg(pos.first)
+        let peek = named["peek"].flatMap { resolveIntArg($0) } ?? 24
+        return .carousel(children: children, peek: peek)
+    }
+
+    private func buildCallout(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
+        let type = pos.first.flatMap { resolveCalloutTypeArg($0) } ?? .info
+        let content = resolveStringArg(pos.safeGet(1))
+        let title = pos.safeGet(2).flatMap { resolveStringArgNullable($0) }
+        return .callout(type: type, content: content, title: title)
+    }
+
+    private func buildTimeline(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
+        let children = resolveChildrenArg(pos.first)
+        return .timeline(children: children)
+    }
+
+    private func buildTimelineItem(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
+        let title = resolveStringArg(pos.first)
+        let subtitle = pos.safeGet(1).flatMap { resolveStringArgNullable($0) }
+        let status = pos.safeGet(2).flatMap { resolveTimelineStatusArg($0) } ?? .pending
+        return .timelineItem(title: title, subtitle: subtitle, status: status)
     }
 
     // MARK: - Action Call Dispatch
@@ -642,6 +733,64 @@ public final class AmeParser {
             }
         }
         return []
+    }
+
+    // MARK: - v1.1 Enum Resolution Helpers
+
+    private func resolveChartTypeArg(_ arg: ParsedValue?) -> ChartType? {
+        guard let arg else { return nil }
+        switch arg {
+        case .ident(let name): return AmeKeywords.parseChartType(name)
+        case .str(let value): return AmeKeywords.parseChartType(value)
+        default: return nil
+        }
+    }
+
+    private func resolveCalloutTypeArg(_ arg: ParsedValue?) -> CalloutType? {
+        guard let arg else { return nil }
+        switch arg {
+        case .ident(let name): return AmeKeywords.parseCalloutType(name)
+        case .str(let value): return AmeKeywords.parseCalloutType(value)
+        default: return nil
+        }
+    }
+
+    private func resolveTimelineStatusArg(_ arg: ParsedValue?) -> TimelineStatus? {
+        guard let arg else { return nil }
+        switch arg {
+        case .ident(let name): return AmeKeywords.parseTimelineStatus(name)
+        case .str(let value): return AmeKeywords.parseTimelineStatus(value)
+        default: return nil
+        }
+    }
+
+    private func resolveSemanticColorArg(_ arg: ParsedValue?) -> SemanticColor? {
+        guard let arg else { return nil }
+        switch arg {
+        case .ident(let name): return AmeKeywords.parseSemanticColor(name)
+        case .str(let value): return AmeKeywords.parseSemanticColor(value)
+        default: return nil
+        }
+    }
+
+    // MARK: - Numeric Array Resolution Helpers
+
+    private func resolveDoubleListArg(_ arg: ParsedValue?) -> [Double]? {
+        guard case .arr(let items) = arg else { return nil }
+        return items.compactMap { item -> Double? in
+            Double(item.trimmingCharacters(in: .whitespaces))
+        }
+    }
+
+    private func resolveNestedDoubleListArg(_ arg: ParsedValue?) -> [[Double]]? {
+        guard case .arr(let items) = arg else { return nil }
+        return items.compactMap { rowStr -> [Double]? in
+            let rowParsed = parseArgValue(rowStr.trimmingCharacters(in: .whitespaces))
+            guard case .arr(let cells) = rowParsed else { return nil }
+            return cells.compactMap { cellStr -> Double? in
+                Double(cellStr.trimmingCharacters(in: .whitespaces))
+            }
+        }
     }
 
     // MARK: - String Literal Parser
@@ -930,6 +1079,13 @@ public final class AmeParser {
             return .card(children: resolveChildren(children, scope: effectiveScope), elevation: elevation)
         case .dataList(let children, let dividers):
             return .dataList(children: resolveChildren(children, scope: effectiveScope), dividers: dividers)
+        case .accordion(let title, let children, let expanded):
+            let resolvedTitle = effectiveScope.map { resolvePathInScope(title, scope: $0) } ?? title
+            return .accordion(title: resolvedTitle, children: resolveChildren(children, scope: effectiveScope), expanded: expanded)
+        case .carousel(let children, let peek):
+            return .carousel(children: resolveChildren(children, scope: effectiveScope), peek: peek)
+        case .timeline(let children):
+            return .timeline(children: resolveChildren(children, scope: effectiveScope))
         case .ref(let id):
             if let resolved = registry[id] { return resolveTree(resolved, scope: effectiveScope) }
             return node
@@ -938,15 +1094,15 @@ public final class AmeParser {
             let expanded = expandEach(node, parentScope: s)
             if expanded.count == 1 { return expanded[0] }
             return .col(children: expanded)
-        case .txt(let text, let style, let maxLines):
+        case .txt(let text, let style, let maxLines, let color):
             guard let s = effectiveScope else { return node }
-            return .txt(text: resolvePathInScope(text, scope: s), style: style, maxLines: maxLines)
+            return .txt(text: resolvePathInScope(text, scope: s), style: style, maxLines: maxLines, color: color)
         case .img(let url, let height):
             guard let s = effectiveScope else { return node }
             return .img(url: resolvePathInScope(url, scope: s), height: height)
-        case .badge(let label, let variant):
+        case .badge(let label, let variant, let color):
             guard let s = effectiveScope else { return node }
-            return .badge(label: resolvePathInScope(label, scope: s), variant: variant)
+            return .badge(label: resolvePathInScope(label, scope: s), variant: variant, color: color)
         case .progress(let value, let label):
             guard let s = effectiveScope, let lbl = label else { return node }
             return .progress(value: value, label: resolvePathInScope(lbl, scope: s))
@@ -956,6 +1112,20 @@ public final class AmeParser {
         case .icon(let name, let size):
             guard let s = effectiveScope else { return node }
             return .icon(name: resolvePathInScope(name, scope: s), size: size)
+        case .callout(let calloutType, let content, let title):
+            guard let s = effectiveScope else { return node }
+            return .callout(type: calloutType, content: resolvePathInScope(content, scope: s),
+                            title: title.map { resolvePathInScope($0, scope: s) })
+        case .code(let language, let content, let title):
+            guard let s = effectiveScope else { return node }
+            return .code(language: language, content: resolvePathInScope(content, scope: s),
+                         title: title.map { resolvePathInScope($0, scope: s) })
+        case .timelineItem(let title, let subtitle, let status):
+            guard let s = effectiveScope else { return node }
+            return .timelineItem(title: resolvePathInScope(title, scope: s),
+                                 subtitle: subtitle.map { resolvePathInScope($0, scope: s) }, status: status)
+        case .chart:
+            return resolveChartPaths(node, scope: effectiveScope)
         default:
             return node
         }
@@ -1025,6 +1195,71 @@ public final class AmeParser {
         if let s = current as? String { return s }
         if let n = current as? NSNumber { return n.stringValue }
         return ""
+    }
+
+    // MARK: - Chart $path Data Resolution
+
+    private func resolveChartPaths(_ node: AmeNode, scope: [String: Any]?) -> AmeNode {
+        guard case .chart(let type, let values, let labels, let series,
+                          let height, let color, let valuesPath, let labelsPath, let seriesPath) = node else {
+            return node
+        }
+        guard let s = scope else { return node }
+
+        let resolvedValues = values ?? valuesPath.flatMap { resolveDoubleArrayFromData($0, scope: s) }
+        let resolvedLabels = labels ?? labelsPath.flatMap { resolveStringArrayFromData($0, scope: s) }
+        let resolvedSeries = series ?? seriesPath.flatMap { resolveNestedDoubleArrayFromData($0, scope: s) }
+
+        return .chart(type: type, values: resolvedValues, labels: resolvedLabels, series: resolvedSeries,
+                      height: height, color: color,
+                      valuesPath: nil, labelsPath: nil, seriesPath: nil)
+    }
+
+    private func resolveDoubleArrayFromData(_ path: String, scope: [String: Any]) -> [Double]? {
+        let element = navigateDataPath(path, scope: scope)
+        guard let array = element as? [Any] else { return nil }
+        return array.compactMap { item -> Double? in
+            if let n = item as? NSNumber { return n.doubleValue }
+            if let s = item as? String { return Double(s) }
+            return nil
+        }
+    }
+
+    private func resolveStringArrayFromData(_ path: String, scope: [String: Any]) -> [String]? {
+        let element = navigateDataPath(path, scope: scope)
+        guard let array = element as? [Any] else { return nil }
+        return array.compactMap { item -> String? in
+            if let s = item as? String { return s }
+            if let n = item as? NSNumber { return n.stringValue }
+            return nil
+        }
+    }
+
+    private func resolveNestedDoubleArrayFromData(_ path: String, scope: [String: Any]) -> [[Double]]? {
+        let element = navigateDataPath(path, scope: scope)
+        guard let outerArray = element as? [Any] else { return nil }
+        return outerArray.compactMap { inner -> [Double]? in
+            guard let innerArray = inner as? [Any] else { return nil }
+            return innerArray.compactMap { item -> Double? in
+                if let n = item as? NSNumber { return n.doubleValue }
+                if let s = item as? String { return Double(s) }
+                return nil
+            }
+        }
+    }
+
+    private func navigateDataPath(_ path: String, scope: [String: Any]) -> Any? {
+        let segments = path.hasPrefix("$") ? String(path.dropFirst()).components(separatedBy: "/")
+                                           : path.components(separatedBy: "/")
+        var current: Any = scope
+        for segment in segments {
+            guard let dict = current as? [String: Any],
+                  let next = dict[segment] else {
+                return nil
+            }
+            current = next
+        }
+        return current
     }
 
     // MARK: - Data Model Access

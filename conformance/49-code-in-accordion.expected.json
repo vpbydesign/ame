@@ -1,0 +1,1 @@
+{"_type":"accordion","children":[{"_type":"code","content":"fun main() {\n    println(\"Hello\")\n}","language":"kotlin"}],"title":"Implementation"}

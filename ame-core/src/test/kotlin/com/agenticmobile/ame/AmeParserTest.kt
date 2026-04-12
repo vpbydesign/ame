@@ -1218,4 +1218,443 @@ class AmeParserTest {
         assertIs<AmeNode.Txt>(txt1)
         assertEquals("Second", txt1.text)
     }
+
+    // ── v1.1 Chart Tests ──────────────────────────────────────────────
+
+    @Test
+    fun parseChartBar() {
+        val result = parse("""
+            root = chart(bar, values=[1,2,3], labels=["a","b","c"])
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Chart>(result)
+        assertEquals(ChartType.BAR, result.type)
+        assertEquals(listOf(1.0, 2.0, 3.0), result.values)
+        assertEquals(listOf("a", "b", "c"), result.labels)
+    }
+
+    @Test
+    fun parseChartLine() {
+        val result = parse("""
+            root = chart(line, values=[10,20], height=180)
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Chart>(result)
+        assertEquals(ChartType.LINE, result.type)
+        assertEquals(listOf(10.0, 20.0), result.values)
+        assertEquals(180, result.height)
+    }
+
+    @Test
+    fun parseChartPie() {
+        val result = parse("""
+            root = chart(pie, values=[30,50,20])
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Chart>(result)
+        assertEquals(ChartType.PIE, result.type)
+        assertEquals(listOf(30.0, 50.0, 20.0), result.values)
+    }
+
+    @Test
+    fun parseChartSparkline() {
+        val result = parse("""
+            root = chart(sparkline, values=[1,3,2,5], height=32, color=success)
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Chart>(result)
+        assertEquals(ChartType.SPARKLINE, result.type)
+        assertEquals(listOf(1.0, 3.0, 2.0, 5.0), result.values)
+        assertEquals(32, result.height)
+        assertEquals(SemanticColor.SUCCESS, result.color)
+    }
+
+    @Test
+    fun parseChartWithDataBinding() {
+        val result = parse("""
+            root = chart(bar, values=${"$"}amounts, labels=${"$"}months)
+            ---
+            {"amounts":[100,200,300],"months":["Jan","Feb","Mar"]}
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Chart>(result)
+        assertEquals(ChartType.BAR, result.type)
+        assertEquals(listOf(100.0, 200.0, 300.0), result.values)
+        assertEquals(listOf("Jan", "Feb", "Mar"), result.labels)
+        assertNull(result.valuesPath)
+        assertNull(result.labelsPath)
+    }
+
+    @Test
+    fun parseChartUnknownType() {
+        val result = parse("""
+            root = chart(donut, values=[1,2])
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Chart>(result)
+        assertEquals(ChartType.BAR, result.type)
+    }
+
+    @Test
+    fun parseChartEmptyValues() {
+        val result = parse("""
+            root = chart(bar)
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Chart>(result)
+        assertEquals(ChartType.BAR, result.type)
+        assertNull(result.values)
+    }
+
+    // ── v1.1 Code Tests ───────────────────────────────────────────────
+
+    @Test
+    fun parseCode() {
+        val result = parse("""
+            root = code("kotlin", "val x = 1")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Code>(result)
+        assertEquals("kotlin", result.language)
+        assertEquals("val x = 1", result.content)
+        assertNull(result.title)
+    }
+
+    @Test
+    fun parseCodeWithTitle() {
+        val result = parse("""
+            root = code("yaml", "key: val", "config.yml")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Code>(result)
+        assertEquals("yaml", result.language)
+        assertEquals("key: val", result.content)
+        assertEquals("config.yml", result.title)
+    }
+
+    @Test
+    fun parseCodeWithEscapes() {
+        val result = parse("""
+            root = code("kotlin", "line1\nline2\ttab\\end\"quote")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Code>(result)
+        assertEquals("line1\nline2\ttab\\end\"quote", result.content)
+    }
+
+    // ── v1.1 Accordion Tests ──────────────────────────────────────────
+
+    @Test
+    fun parseAccordion() {
+        val result = parse("""
+            c1 = txt("Child 1")
+            c2 = txt("Child 2")
+            root = accordion("Details", [c1, c2])
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Accordion>(result)
+        assertEquals("Details", result.title)
+        assertEquals(2, result.children.size)
+        assertEquals(false, result.expanded)
+    }
+
+    @Test
+    fun parseAccordionExpanded() {
+        val result = parse("""
+            c1 = txt("Content")
+            root = accordion("Title", [c1], true)
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Accordion>(result)
+        assertEquals(true, result.expanded)
+    }
+
+    @Test
+    fun parseAccordionDefaultCollapsed() {
+        val result = parse("""
+            root = accordion("FAQ", [txt("Answer")])
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Accordion>(result)
+        assertEquals(false, result.expanded)
+    }
+
+    // ── v1.1 Carousel Tests ───────────────────────────────────────────
+
+    @Test
+    fun parseCarousel() {
+        val result = parse("""
+            root = carousel([txt("A"), txt("B"), txt("C")])
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Carousel>(result)
+        assertEquals(3, result.children.size)
+    }
+
+    @Test
+    fun parseCarouselWithPeek() {
+        val result = parse("""
+            root = carousel([txt("A"), txt("B")], peek=32)
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Carousel>(result)
+        assertEquals(2, result.children.size)
+        assertEquals(32, result.peek)
+    }
+
+    @Test
+    fun parseCarouselDefaultPeek() {
+        val result = parse("""
+            root = carousel([txt("A")])
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Carousel>(result)
+        assertEquals(24, result.peek)
+    }
+
+    // ── v1.1 Callout Tests ────────────────────────────────────────────
+
+    @Test
+    fun parseCalloutInfo() {
+        val result = parse("""
+            root = callout(info, "This is informational")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Callout>(result)
+        assertEquals(CalloutType.INFO, result.type)
+        assertEquals("This is informational", result.content)
+        assertNull(result.title)
+    }
+
+    @Test
+    fun parseCalloutWarning() {
+        val result = parse("""
+            root = callout(warning, "Proceed with caution")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Callout>(result)
+        assertEquals(CalloutType.WARNING, result.type)
+    }
+
+    @Test
+    fun parseCalloutWithTitle() {
+        val result = parse("""
+            root = callout(tip, "Use keyboard shortcuts", "Pro Tip")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Callout>(result)
+        assertEquals(CalloutType.TIP, result.type)
+        assertEquals("Use keyboard shortcuts", result.content)
+        assertEquals("Pro Tip", result.title)
+    }
+
+    @Test
+    fun parseCalloutAllTypes() {
+        for ((name, expected) in listOf(
+            "info" to CalloutType.INFO,
+            "warning" to CalloutType.WARNING,
+            "error" to CalloutType.ERROR,
+            "success" to CalloutType.SUCCESS,
+            "tip" to CalloutType.TIP
+        )) {
+            val result = parse("root = callout($name, \"msg\")")
+            assertNotNull(result, "callout($name) returned null")
+            assertIs<AmeNode.Callout>(result)
+            assertEquals(expected, result.type, "callout($name) type mismatch")
+        }
+    }
+
+    @Test
+    fun parseCalloutUnknownType() {
+        val result = parse("""
+            root = callout(banana, "msg")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Callout>(result)
+        assertEquals(CalloutType.INFO, result.type)
+    }
+
+    // ── v1.1 Timeline Tests ───────────────────────────────────────────
+
+    @Test
+    fun parseTimeline() {
+        val result = parse("""
+            s1 = timeline_item("Step 1", "Done", done)
+            s2 = timeline_item("Step 2", "In progress", active)
+            root = timeline([s1, s2])
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Timeline>(result)
+        assertEquals(2, result.children.size)
+
+        val item0 = result.children[0]
+        assertIs<AmeNode.TimelineItem>(item0)
+        assertEquals("Step 1", item0.title)
+        assertEquals("Done", item0.subtitle)
+        assertEquals(TimelineStatus.DONE, item0.status)
+
+        val item1 = result.children[1]
+        assertIs<AmeNode.TimelineItem>(item1)
+        assertEquals(TimelineStatus.ACTIVE, item1.status)
+    }
+
+    @Test
+    fun parseTimelineItem() {
+        val result = parse("""
+            root = timeline_item("Title", "Subtitle", done)
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.TimelineItem>(result)
+        assertEquals("Title", result.title)
+        assertEquals("Subtitle", result.subtitle)
+        assertEquals(TimelineStatus.DONE, result.status)
+    }
+
+    @Test
+    fun parseTimelineItemDefaultStatus() {
+        val result = parse("""
+            root = timeline_item("Upcoming")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.TimelineItem>(result)
+        assertEquals(TimelineStatus.PENDING, result.status)
+    }
+
+    @Test
+    fun parseTimelineItemAllStatuses() {
+        for ((name, expected) in listOf(
+            "done" to TimelineStatus.DONE,
+            "active" to TimelineStatus.ACTIVE,
+            "pending" to TimelineStatus.PENDING,
+            "error" to TimelineStatus.ERROR
+        )) {
+            val result = parse("root = timeline_item(\"t\", \"s\", $name)")
+            assertNotNull(result, "timeline_item with status=$name returned null")
+            assertIs<AmeNode.TimelineItem>(result)
+            assertEquals(expected, result.status, "status=$name mismatch")
+        }
+    }
+
+    // ── v1.1 Txt/Badge Color Tests ────────────────────────────────────
+
+    @Test
+    fun parseTxtWithColor() {
+        val result = parse("""
+            root = txt("Alert text", body, color=warning)
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Txt>(result)
+        assertEquals("Alert text", result.text)
+        assertEquals(TxtStyle.BODY, result.style)
+        assertEquals(SemanticColor.WARNING, result.color)
+    }
+
+    @Test
+    fun parseTxtWithoutColor() {
+        val result = parse("""
+            root = txt("Normal", headline)
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Txt>(result)
+        assertNull(result.color)
+    }
+
+    @Test
+    fun parseBadgeWithColor() {
+        val result = parse("""
+            root = badge("Live", success, color=success)
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Badge>(result)
+        assertEquals("Live", result.label)
+        assertEquals(BadgeVariant.SUCCESS, result.variant)
+        assertEquals(SemanticColor.SUCCESS, result.color)
+    }
+
+    // ── v1.1 Chart Multi-Series Test ──────────────────────────────────
+
+    @Test
+    fun parseChartMultiSeries() {
+        val result = parse("""
+            root = chart(line, series=[[1,2,3],[4,5,6]], labels=["a","b","c"])
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Chart>(result)
+        assertEquals(ChartType.LINE, result.type)
+        assertNotNull(result.series)
+        assertEquals(2, result.series!!.size)
+        assertEquals(listOf(1.0, 2.0, 3.0), result.series!![0])
+        assertEquals(listOf(4.0, 5.0, 6.0), result.series!![1])
+        assertEquals(listOf("a", "b", "c"), result.labels)
+    }
+
+    // ── WP#5b.1 Regression: Chart $path inside each() ─────────────────
+
+    @Test
+    fun chartInsideEachResolvesPerItemScope() {
+        val parser = AmeParser()
+        val result = parser.parse("""
+            root = col([results])
+            results = each(${"$"}restaurants, tpl)
+            tpl = col([name, spending])
+            name = txt(${"$"}name, title)
+            spending = chart(bar, values=${"$"}sales)
+            ---
+            {"restaurants":[{"name":"Luigi's","sales":[10,20,30]},{"name":"Bella's","sales":[40,50,60]}]}
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Col>(result)
+
+        val expanded = result.children[0]
+        assertIs<AmeNode.Col>(expanded)
+        assertEquals(2, expanded.children.size)
+
+        val tpl1 = expanded.children[0]
+        assertIs<AmeNode.Col>(tpl1)
+        val name1 = tpl1.children[0]
+        assertIs<AmeNode.Txt>(name1)
+        assertEquals("Luigi's", name1.text)
+        val chart1 = tpl1.children[1]
+        assertIs<AmeNode.Chart>(chart1)
+        assertEquals(listOf(10.0, 20.0, 30.0), chart1.values)
+        assertNull(chart1.valuesPath)
+
+        val tpl2 = expanded.children[1]
+        assertIs<AmeNode.Col>(tpl2)
+        val name2 = tpl2.children[0]
+        assertIs<AmeNode.Txt>(name2)
+        assertEquals("Bella's", name2.text)
+        val chart2 = tpl2.children[1]
+        assertIs<AmeNode.Chart>(chart2)
+        assertEquals(listOf(40.0, 50.0, 60.0), chart2.values)
+        assertNull(chart2.valuesPath)
+    }
 }

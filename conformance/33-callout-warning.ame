@@ -1,0 +1,3 @@
+// conformance/33-callout-warning.ame
+// Tests: warning callout
+root = callout(warning, "Do not take ibuprofen on an empty stomach.")

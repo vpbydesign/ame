@@ -1,0 +1,3 @@
+// conformance/23-code-empty-content.ame
+// Tests: code block with empty content (edge case)
+root = code("kotlin", "")

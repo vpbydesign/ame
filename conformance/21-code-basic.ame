@@ -1,0 +1,3 @@
+// conformance/21-code-basic.ame
+// Tests: basic code block with language and content
+root = code("python", "def hello():\n    print(\"Hello, World!\")")

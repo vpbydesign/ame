@@ -1,0 +1,1 @@
+{"_type":"col","children":[{"_type":"txt","style":"headline","text":"System Alerts"},{"_type":"col","children":[{"_type":"callout","content":"Battery low","type":"warning"},{"_type":"callout","content":"Update available","type":"warning"}]}]}

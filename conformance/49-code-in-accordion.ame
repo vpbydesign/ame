@@ -1,0 +1,4 @@
+// conformance/49-code-in-accordion.ame
+// Tests: code block nested inside accordion children
+root = accordion("Implementation", [snippet])
+snippet = code("kotlin", "fun main() {\n    println(\"Hello\")\n}")

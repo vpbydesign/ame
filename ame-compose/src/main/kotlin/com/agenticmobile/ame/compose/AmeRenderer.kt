@@ -2,20 +2,42 @@
 
 package com.agenticmobile.ame.compose
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
@@ -47,7 +69,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,10 +96,10 @@ import java.util.TimeZone
  * Recursive Composable that renders any [AmeNode] tree as native Material 3 UI.
  *
  * This is the main entry point for the AME Compose renderer. It dispatches
- * to type-specific private composables via an exhaustive `when` over all 17
- * [AmeNode] sealed subtypes. The Kotlin compiler enforces exhaustiveness —
- * adding a new subtype to [AmeNode] will cause a compile error here until
- * a rendering branch is added.
+ * to type-specific private composables via an exhaustive `when` over all 24
+ * [AmeNode] sealed subtypes (21 visual + Ref, Each, TimelineItem).
+ * The Kotlin compiler enforces exhaustiveness — adding a new subtype to
+ * [AmeNode] will cause a compile error here until a rendering branch is added.
  *
  * @param node The AME node tree to render.
  * @param formState Manages form input/toggle values for this rendering scope.
@@ -118,6 +147,13 @@ fun AmeRenderer(
         is AmeNode.Toggle -> AmeToggle(node, formState, modifier)
         is AmeNode.DataList -> AmeDataList(node, formState, onAction, modifier, depth)
         is AmeNode.Table -> AmeTable(node, modifier)
+        is AmeNode.Chart -> AmeChart(node, modifier)
+        is AmeNode.Code -> AmeCode(node, modifier)
+        is AmeNode.Accordion -> AmeAccordion(node, formState, onAction, modifier, depth)
+        is AmeNode.Carousel -> AmeCarousel(node, formState, onAction, modifier, depth)
+        is AmeNode.Callout -> AmeCallout(node, modifier)
+        is AmeNode.Timeline -> AmeTimeline(node, formState, onAction, modifier, depth)
+        is AmeNode.TimelineItem -> AmeTimelineItemStandalone(node, modifier)
         is AmeNode.Ref -> AmeSkeleton(node.id, modifier)
         is AmeNode.Each -> AmeEach(node, modifier)
     }
@@ -186,12 +222,13 @@ private fun AmeRow(
 
 // ── Content Primitives ─────────────────────────────────────────────────────
 
-/** Text display with AME typographic style mapping. */
+/** Text display with AME typographic style mapping and optional semantic color. */
 @Composable
 private fun AmeTxt(node: AmeNode.Txt, modifier: Modifier) {
     Text(
         text = node.text,
         style = AmeTheme.textStyle(node.style),
+        color = node.color?.let { AmeTheme.semanticColor(it) } ?: Color.Unspecified,
         maxLines = node.maxLines ?: Int.MAX_VALUE,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier,
@@ -255,12 +292,14 @@ private fun AmeCard(
     }
 }
 
-/** Small colored label for status indicators. */
+/** Small colored label for status indicators. SemanticColor overrides variant when present. */
 @Composable
 private fun AmeBadge(node: AmeNode.Badge, modifier: Modifier) {
+    val bgColor = node.color?.let { AmeTheme.semanticColor(it) }
+        ?: AmeTheme.badgeColor(node.variant)
     Surface(
         shape = RoundedCornerShape(4.dp),
-        color = AmeTheme.badgeColor(node.variant),
+        color = bgColor,
         modifier = modifier.padding(horizontal = 2.dp),
     ) {
         Text(
@@ -652,6 +691,264 @@ private fun AmeTable(node: AmeNode.Table, modifier: Modifier) {
                     )
                 }
             }
+        }
+    }
+}
+
+// ── v1.1 Primitives ────────────────────────────────────────────────────────
+
+/** Delegates to the pluggable [AmeChartRenderer] via [LocalAmeChartRenderer]. */
+@Composable
+private fun AmeChart(node: AmeNode.Chart, modifier: Modifier) {
+    val renderer = LocalAmeChartRenderer.current
+    renderer.RenderChart(node, modifier)
+}
+
+/** Syntax-highlighted code block with copy affordance. Dark background is intentional (v1.1). */
+@Composable
+private fun AmeCode(node: AmeNode.Code, modifier: Modifier) {
+    Surface(
+        color = Color(0xFF1E1E1E),
+        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = node.title ?: node.language,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray
+                )
+                val clipboardManager = LocalClipboardManager.current
+                IconButton(
+                    onClick = { clipboardManager.setText(AnnotatedString(node.content)) },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.ContentCopy,
+                        contentDescription = "Copy code",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            SelectionContainer {
+                Text(
+                    text = node.content,
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFD4D4D4),
+                    modifier = Modifier
+                        .horizontalScroll(rememberScrollState())
+                        .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+                )
+            }
+        }
+    }
+}
+
+/** Collapsible section with animated chevron and expand/shrink transition. */
+@Composable
+private fun AmeAccordion(
+    node: AmeNode.Accordion,
+    formState: AmeFormState,
+    onAction: (AmeAction) -> Unit,
+    modifier: Modifier,
+    depth: Int,
+) {
+    var isExpanded by remember { mutableStateOf(node.expanded) }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = tween(200),
+        label = "chevron"
+    )
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { isExpanded = !isExpanded }
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = node.title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Filled.ExpandMore,
+                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                modifier = Modifier.rotate(chevronRotation)
+            )
+        }
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically(animationSpec = tween(200)),
+            exit = shrinkVertically(animationSpec = tween(200))
+        ) {
+            Column(
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                node.children.forEach { child ->
+                    AmeRenderer(child, formState, onAction, depth = depth + 1)
+                }
+            }
+        }
+    }
+}
+
+/** Horizontally scrollable container with snap-to-item fling behavior. */
+@Composable
+private fun AmeCarousel(
+    node: AmeNode.Carousel,
+    formState: AmeFormState,
+    onAction: (AmeAction) -> Unit,
+    modifier: Modifier,
+    depth: Int,
+) {
+    if (node.children.isEmpty()) return
+    val state = rememberLazyListState()
+    LazyRow(
+        state = state,
+        flingBehavior = rememberSnapFlingBehavior(lazyListState = state),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = node.peek.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        items(node.children.size) { index ->
+            Box(modifier = Modifier.fillParentMaxWidth(0.85f)) {
+                AmeRenderer(node.children[index], formState, onAction, depth = depth + 1)
+            }
+        }
+    }
+}
+
+/** Visually distinct alert/info box with type-specific icon and tint from [AmeTheme]. */
+@Composable
+private fun AmeCallout(node: AmeNode.Callout, modifier: Modifier) {
+    val style = AmeTheme.calloutStyle(node.type)
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = style.backgroundColor,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = style.icon,
+                contentDescription = null,
+                tint = style.iconTint,
+                modifier = Modifier.size(24.dp)
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (node.title != null) {
+                    Text(
+                        text = node.title!!,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+                Text(
+                    text = node.content,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Ordered vertical event sequence. Timeline items render with status circles
+ * and connector lines. Connectors use [IntrinsicSize.Min] + weight(1f) to
+ * stretch to match text height. Dashed lines use [PathEffect.dashPathEffect].
+ */
+@Composable
+private fun AmeTimeline(
+    node: AmeNode.Timeline,
+    formState: AmeFormState,
+    onAction: (AmeAction) -> Unit,
+    modifier: Modifier,
+    depth: Int,
+) {
+    if (node.children.isEmpty()) return
+    Column(modifier = modifier) {
+        node.children.forEachIndexed { index, child ->
+            if (child is AmeNode.TimelineItem) {
+                val style = AmeTheme.timelineStyle(child.status)
+                Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxHeight()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(style.circleColor)
+                        )
+                        if (index < node.children.lastIndex) {
+                            if (style.isDashed) {
+                                Canvas(modifier = Modifier.width(2.dp).weight(1f)) {
+                                    drawLine(
+                                        color = style.lineColor,
+                                        start = Offset(size.width / 2, 0f),
+                                        end = Offset(size.width / 2, size.height),
+                                        strokeWidth = 2.dp.toPx(),
+                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .width(2.dp)
+                                        .weight(1f)
+                                        .background(style.lineColor)
+                                )
+                            }
+                        }
+                    }
+                    androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.padding(bottom = 16.dp)) {
+                        Text(
+                            text = child.title,
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        if (!child.subtitle.isNullOrEmpty()) {
+                            Text(
+                                text = child.subtitle!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            } else {
+                AmeRenderer(child, formState, onAction, depth = depth + 1)
+            }
+        }
+    }
+}
+
+/** Standalone fallback when [AmeNode.TimelineItem] appears outside a timeline container. */
+@Composable
+private fun AmeTimelineItemStandalone(node: AmeNode.TimelineItem, modifier: Modifier) {
+    Column(modifier = modifier.padding(8.dp)) {
+        Text(text = node.title, style = MaterialTheme.typography.titleSmall)
+        if (!node.subtitle.isNullOrEmpty()) {
+            Text(
+                text = node.subtitle!!,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

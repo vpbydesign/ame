@@ -1,16 +1,40 @@
 package com.agenticmobile.ame.compose
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import com.agenticmobile.ame.BadgeVariant
 import com.agenticmobile.ame.BtnStyle
+import com.agenticmobile.ame.CalloutType
+import com.agenticmobile.ame.SemanticColor
+import com.agenticmobile.ame.TimelineStatus
 import com.agenticmobile.ame.TxtStyle
+
+/** Composite style for callout rendering — icon, tint, and background. */
+data class CalloutStyle(
+    val backgroundColor: Color,
+    val iconTint: Color,
+    val icon: ImageVector
+)
+
+/** Composite style for timeline step rendering — circle, connector, and dash. */
+data class TimelineStyle(
+    val circleColor: Color,
+    val lineColor: Color,
+    val isDashed: Boolean
+)
 
 /**
  * Configuration holder for all AME style mappings.
@@ -23,6 +47,9 @@ data class AmeThemeConfig(
     val textStyles: @Composable (TxtStyle) -> TextStyle = { defaultTextStyle(it) },
     val badgeColors: @Composable (BadgeVariant) -> Color = { defaultBadgeColor(it) },
     val btnColors: @Composable (BtnStyle) -> ButtonColors = { defaultBtnColors(it) },
+    val calloutStyles: @Composable (CalloutType) -> CalloutStyle = { defaultCalloutStyle(it) },
+    val timelineStyles: @Composable (TimelineStatus) -> TimelineStyle = { defaultTimelineStyle(it) },
+    val semanticColors: @Composable (SemanticColor) -> Color = { defaultSemanticColor(it) },
 )
 
 /**
@@ -55,6 +82,15 @@ object AmeTheme {
 
     @Composable
     fun btnColors(style: BtnStyle): ButtonColors = config.btnColors(style)
+
+    @Composable
+    fun calloutStyle(type: CalloutType): CalloutStyle = config.calloutStyles(type)
+
+    @Composable
+    fun timelineStyle(status: TimelineStatus): TimelineStyle = config.timelineStyles(status)
+
+    @Composable
+    fun semanticColor(color: SemanticColor): Color = config.semanticColors(color)
 }
 
 // ── Default Mapping Functions ──────────────────────────────────────────────
@@ -104,4 +140,79 @@ internal fun defaultBtnColors(style: BtnStyle): ButtonColors = when (style) {
         containerColor = MaterialTheme.colorScheme.error,
         contentColor = MaterialTheme.colorScheme.onError,
     )
+}
+
+/**
+ * Maps [CalloutType] to a composite [CalloutStyle] with background, icon, and tint.
+ * SUCCESS/WARNING use canonical Material Design values matching [defaultBadgeColor].
+ */
+@Composable
+internal fun defaultCalloutStyle(type: CalloutType): CalloutStyle = when (type) {
+    CalloutType.INFO -> CalloutStyle(
+        backgroundColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+        iconTint = MaterialTheme.colorScheme.primary,
+        icon = Icons.Filled.Info
+    )
+    CalloutType.WARNING -> CalloutStyle(
+        backgroundColor = Color(0xFFFFF3E0),
+        iconTint = Color(0xFFFF9800),
+        icon = Icons.Filled.Warning
+    )
+    CalloutType.ERROR -> CalloutStyle(
+        backgroundColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+        iconTint = MaterialTheme.colorScheme.error,
+        icon = Icons.Filled.Error
+    )
+    CalloutType.SUCCESS -> CalloutStyle(
+        backgroundColor = Color(0xFFE8F5E9),
+        iconTint = Color(0xFF4CAF50),
+        icon = Icons.Filled.CheckCircle
+    )
+    CalloutType.TIP -> CalloutStyle(
+        backgroundColor = Color(0xFFF3E5F5),
+        iconTint = Color(0xFF9C27B0),
+        icon = Icons.Filled.Lightbulb
+    )
+}
+
+/**
+ * Maps [TimelineStatus] to a composite [TimelineStyle] with circle color,
+ * connector line color, and dashed flag.
+ */
+@Composable
+internal fun defaultTimelineStyle(status: TimelineStatus): TimelineStyle = when (status) {
+    TimelineStatus.DONE -> TimelineStyle(
+        circleColor = MaterialTheme.colorScheme.primary,
+        lineColor = MaterialTheme.colorScheme.primary,
+        isDashed = false
+    )
+    TimelineStatus.ACTIVE -> TimelineStyle(
+        circleColor = MaterialTheme.colorScheme.primary,
+        lineColor = MaterialTheme.colorScheme.outline,
+        isDashed = true
+    )
+    TimelineStatus.PENDING -> TimelineStyle(
+        circleColor = MaterialTheme.colorScheme.outline,
+        lineColor = MaterialTheme.colorScheme.outline,
+        isDashed = true
+    )
+    TimelineStatus.ERROR -> TimelineStyle(
+        circleColor = MaterialTheme.colorScheme.error,
+        lineColor = MaterialTheme.colorScheme.error,
+        isDashed = false
+    )
+}
+
+/**
+ * Maps [SemanticColor] to Material 3 [Color] objects.
+ * SUCCESS and WARNING use canonical Material Design hex values
+ * matching [defaultBadgeColor] for visual consistency.
+ */
+@Composable
+internal fun defaultSemanticColor(color: SemanticColor): Color = when (color) {
+    SemanticColor.PRIMARY -> MaterialTheme.colorScheme.primary
+    SemanticColor.SECONDARY -> MaterialTheme.colorScheme.secondary
+    SemanticColor.ERROR -> MaterialTheme.colorScheme.error
+    SemanticColor.SUCCESS -> Color(0xFF4CAF50)
+    SemanticColor.WARNING -> Color(0xFFFF9800)
 }

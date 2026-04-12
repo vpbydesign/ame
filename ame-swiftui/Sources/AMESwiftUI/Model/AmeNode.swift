@@ -2,7 +2,7 @@ import Foundation
 
 /// Sealed type representing all AME UI node types.
 ///
-/// 15 visual primitives (matching primitives.md exactly),
+/// 21 visual primitives (matching primitives.md v1.1 exactly),
 /// 1 streaming forward reference (ref),
 /// 1 data iteration construct (each).
 ///
@@ -31,7 +31,7 @@ public indirect enum AmeNode: Equatable, Sendable {
     // MARK: Content Primitives
 
     /// Text display with typographic style.
-    case txt(text: String, style: TxtStyle = .body, maxLines: Int? = nil)
+    case txt(text: String, style: TxtStyle = .body, maxLines: Int? = nil, color: SemanticColor? = nil)
 
     /// Image loaded from a URL. Width fills available space.
     case img(url: String, height: Int? = nil)
@@ -51,7 +51,7 @@ public indirect enum AmeNode: Equatable, Sendable {
     case card(children: [AmeNode] = [], elevation: Int = 1)
 
     /// Small colored label for status indicators, counts, or categories.
-    case badge(label: String, variant: BadgeVariant = .default)
+    case badge(label: String, variant: BadgeVariant = .default, color: SemanticColor? = nil)
 
     /// Horizontal progress bar with optional label. Value clamped to 0.0–1.0.
     case progress(value: Float, label: String? = nil)
@@ -77,6 +77,42 @@ public indirect enum AmeNode: Equatable, Sendable {
 
     /// Grid of text values with a header row.
     case table(headers: [String], rows: [[String]])
+
+    // MARK: Visualization Primitives
+
+    /// Data visualization chart. Supports line, bar, pie, and sparkline types.
+    /// `valuesPath`, `labelsPath`, and `seriesPath` store unresolved $path
+    /// references. After parse-time resolution against the data model, these
+    /// are cleared to nil and `values`/`labels`/`series` are populated.
+    case chart(type: ChartType, values: [Double]? = nil, labels: [String]? = nil,
+               series: [[Double]]? = nil, height: Int = 200, color: SemanticColor? = nil,
+               valuesPath: String? = nil, labelsPath: String? = nil, seriesPath: String? = nil)
+
+    // MARK: Rich Content Primitives
+
+    /// Syntax-highlighted code block with copy affordance.
+    case code(language: String, content: String, title: String? = nil)
+
+    // MARK: Disclosure Primitives
+
+    /// Collapsible section. Header always visible; children toggle on tap.
+    case accordion(title: String, children: [AmeNode] = [], expanded: Bool = false)
+
+    /// Horizontally scrollable container. `peek` is dp of next item visible.
+    case carousel(children: [AmeNode] = [], peek: Int = 24)
+
+    // MARK: Alert Primitives
+
+    /// Visually distinct alert/info box with type-specific icon and tint.
+    case callout(type: CalloutType, content: String, title: String? = nil)
+
+    // MARK: Sequence Primitives
+
+    /// Ordered vertical event sequence with status connectors.
+    case timeline(children: [AmeNode] = [])
+
+    /// Single step in a timeline. Not rendered standalone.
+    case timelineItem(title: String, subtitle: String? = nil, status: TimelineStatus = .pending)
 
     // MARK: Structural Types (non-visual)
 
@@ -123,6 +159,20 @@ extension AmeNode: Codable {
         case rows
         case dataPath
         case templateId
+        case color
+        case values
+        case labels
+        case series
+        case valuesPath
+        case labelsPath
+        case seriesPath
+        case language
+        case content
+        case title
+        case expanded
+        case peek
+        case subtitle
+        case status
     }
 
     // Separate CodingKeys for encoding to handle the _type vs type collision.
@@ -147,11 +197,12 @@ extension AmeNode: Codable {
             if align != .start { try container.encode(align, forKey: .align) }
             if gap != 8 { try container.encode(gap, forKey: .gap) }
 
-        case .txt(let text, let style, let maxLines):
+        case .txt(let text, let style, let maxLines, let color):
             try container.encode("txt", forKey: .type)
             try container.encode(text, forKey: .text)
             if style != .body { try container.encode(style, forKey: .style) }
             if let maxLines { try container.encode(maxLines, forKey: .maxLines) }
+            if let color { try container.encode(color, forKey: .color) }
 
         case .img(let url, let height):
             try container.encode("img", forKey: .type)
@@ -175,10 +226,11 @@ extension AmeNode: Codable {
             if !children.isEmpty { try container.encode(children, forKey: .children) }
             if elevation != 1 { try container.encode(elevation, forKey: .elevation) }
 
-        case .badge(let label, let variant):
+        case .badge(let label, let variant, let color):
             try container.encode("badge", forKey: .type)
             try container.encode(label, forKey: .label)
             if variant != .default { try container.encode(variant, forKey: .variant) }
+            if let color { try container.encode(color, forKey: .color) }
 
         case .progress(let value, let label):
             try container.encode("progress", forKey: .type)
@@ -215,6 +267,52 @@ extension AmeNode: Codable {
             try container.encode(headers, forKey: .headers)
             try container.encode(rows, forKey: .rows)
 
+        case .chart(let chartType, let values, let labels, let series, let height, let color,
+                    let valuesPath, let labelsPath, let seriesPath):
+            try container.encode("chart", forKey: .type)
+            try container.encode(chartType, forKey: .inputType)
+            if let values { try container.encode(values, forKey: .values) }
+            if let labels { try container.encode(labels, forKey: .labels) }
+            if let series { try container.encode(series, forKey: .series) }
+            if height != 200 { try container.encode(height, forKey: .height) }
+            if let color { try container.encode(color, forKey: .color) }
+            if let valuesPath { try container.encode(valuesPath, forKey: .valuesPath) }
+            if let labelsPath { try container.encode(labelsPath, forKey: .labelsPath) }
+            if let seriesPath { try container.encode(seriesPath, forKey: .seriesPath) }
+
+        case .code(let language, let codeContent, let codeTitle):
+            try container.encode("code", forKey: .type)
+            try container.encode(language, forKey: .language)
+            try container.encode(codeContent, forKey: .content)
+            if let codeTitle { try container.encode(codeTitle, forKey: .title) }
+
+        case .accordion(let accordionTitle, let children, let expanded):
+            try container.encode("accordion", forKey: .type)
+            try container.encode(accordionTitle, forKey: .title)
+            if !children.isEmpty { try container.encode(children, forKey: .children) }
+            if expanded != false { try container.encode(expanded, forKey: .expanded) }
+
+        case .carousel(let children, let peek):
+            try container.encode("carousel", forKey: .type)
+            if !children.isEmpty { try container.encode(children, forKey: .children) }
+            if peek != 24 { try container.encode(peek, forKey: .peek) }
+
+        case .callout(let calloutType, let calloutContent, let calloutTitle):
+            try container.encode("callout", forKey: .type)
+            try container.encode(calloutType, forKey: .inputType)
+            try container.encode(calloutContent, forKey: .content)
+            if let calloutTitle { try container.encode(calloutTitle, forKey: .title) }
+
+        case .timeline(let children):
+            try container.encode("timeline", forKey: .type)
+            if !children.isEmpty { try container.encode(children, forKey: .children) }
+
+        case .timelineItem(let itemTitle, let subtitle, let status):
+            try container.encode("timeline_item", forKey: .type)
+            try container.encode(itemTitle, forKey: .title)
+            if let subtitle { try container.encode(subtitle, forKey: .subtitle) }
+            if status != .pending { try container.encode(status, forKey: .status) }
+
         case .ref(let id):
             try container.encode("ref", forKey: .type)
             try container.encode(id, forKey: .id)
@@ -246,7 +344,8 @@ extension AmeNode: Codable {
             let text = try container.decode(String.self, forKey: .text)
             let style = try container.decodeIfPresent(TxtStyle.self, forKey: .style) ?? .body
             let maxLines = try container.decodeIfPresent(Int.self, forKey: .maxLines)
-            self = .txt(text: text, style: style, maxLines: maxLines)
+            let color = try container.decodeIfPresent(SemanticColor.self, forKey: .color)
+            self = .txt(text: text, style: style, maxLines: maxLines, color: color)
 
         case "img":
             let url = try container.decode(String.self, forKey: .url)
@@ -273,7 +372,8 @@ extension AmeNode: Codable {
         case "badge":
             let label = try container.decode(String.self, forKey: .label)
             let variant = try container.decodeIfPresent(BadgeVariant.self, forKey: .variant) ?? .default
-            self = .badge(label: label, variant: variant)
+            let color = try container.decodeIfPresent(SemanticColor.self, forKey: .color)
+            self = .badge(label: label, variant: variant, color: color)
 
         case "progress":
             let value = try container.decode(Float.self, forKey: .value)
@@ -309,6 +409,53 @@ extension AmeNode: Codable {
             let headers = try container.decode([String].self, forKey: .headers)
             let rows = try container.decode([[String]].self, forKey: .rows)
             self = .table(headers: headers, rows: rows)
+
+        case "chart":
+            let chartType = try container.decode(ChartType.self, forKey: .inputType)
+            let values = try container.decodeIfPresent([Double].self, forKey: .values)
+            let labels = try container.decodeIfPresent([String].self, forKey: .labels)
+            let series = try container.decodeIfPresent([[Double]].self, forKey: .series)
+            let height = try container.decodeIfPresent(Int.self, forKey: .height) ?? 200
+            let color = try container.decodeIfPresent(SemanticColor.self, forKey: .color)
+            let valuesPath = try container.decodeIfPresent(String.self, forKey: .valuesPath)
+            let labelsPath = try container.decodeIfPresent(String.self, forKey: .labelsPath)
+            let seriesPath = try container.decodeIfPresent(String.self, forKey: .seriesPath)
+            self = .chart(type: chartType, values: values, labels: labels, series: series,
+                          height: height, color: color,
+                          valuesPath: valuesPath, labelsPath: labelsPath, seriesPath: seriesPath)
+
+        case "code":
+            let language = try container.decode(String.self, forKey: .language)
+            let codeContent = try container.decode(String.self, forKey: .content)
+            let codeTitle = try container.decodeIfPresent(String.self, forKey: .title)
+            self = .code(language: language, content: codeContent, title: codeTitle)
+
+        case "accordion":
+            let accordionTitle = try container.decode(String.self, forKey: .title)
+            let children = try container.decodeIfPresent([AmeNode].self, forKey: .children) ?? []
+            let expanded = try container.decodeIfPresent(Bool.self, forKey: .expanded) ?? false
+            self = .accordion(title: accordionTitle, children: children, expanded: expanded)
+
+        case "carousel":
+            let children = try container.decodeIfPresent([AmeNode].self, forKey: .children) ?? []
+            let peek = try container.decodeIfPresent(Int.self, forKey: .peek) ?? 24
+            self = .carousel(children: children, peek: peek)
+
+        case "callout":
+            let calloutType = try container.decode(CalloutType.self, forKey: .inputType)
+            let calloutContent = try container.decode(String.self, forKey: .content)
+            let calloutTitle = try container.decodeIfPresent(String.self, forKey: .title)
+            self = .callout(type: calloutType, content: calloutContent, title: calloutTitle)
+
+        case "timeline":
+            let children = try container.decodeIfPresent([AmeNode].self, forKey: .children) ?? []
+            self = .timeline(children: children)
+
+        case "timeline_item":
+            let itemTitle = try container.decode(String.self, forKey: .title)
+            let subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
+            let status = try container.decodeIfPresent(TimelineStatus.self, forKey: .status) ?? .pending
+            self = .timelineItem(title: itemTitle, subtitle: subtitle, status: status)
 
         case "ref":
             let id = try container.decode(String.self, forKey: .id)

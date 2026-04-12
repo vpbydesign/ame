@@ -1,0 +1,9 @@
+// conformance/27-accordion-multiple.ame
+// Tests: multiple accordions in a column
+root = col([q1, q2, q3])
+q1 = accordion("What is AME?", [a1])
+a1 = txt("A compact syntax for LLMs to generate native mobile UI.", body)
+q2 = accordion("How many primitives?", [a2])
+a2 = txt("AME v1.1 has 21 built-in primitives.", body)
+q3 = accordion("Is it open source?", [a3])
+a3 = txt("Yes, Apache 2.0 licensed.", body)

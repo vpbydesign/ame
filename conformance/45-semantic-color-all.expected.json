@@ -1,0 +1,1 @@
+{"_type":"col","children":[{"_type":"txt","color":"primary","text":"Primary"},{"_type":"txt","color":"secondary","text":"Secondary"},{"_type":"txt","color":"error","text":"Error"},{"_type":"txt","color":"success","text":"Success"},{"_type":"txt","color":"warning","text":"Warning"}]}

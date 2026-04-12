@@ -1,0 +1,1 @@
+{"_type":"row","children":[{"_type":"badge","color":"success","label":"Active"},{"_type":"badge","color":"warning","label":"Pending"},{"_type":"badge","color":"error","label":"Failed"}]}

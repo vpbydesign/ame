@@ -1,0 +1,4 @@
+// conformance/40-timeline-single.ame
+// Tests: timeline with single item
+root = timeline([only])
+only = timeline_item("Single Step")

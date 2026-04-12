@@ -1,0 +1,8 @@
+// conformance/20-chart-data-binding.ame
+// Tests: chart values and labels from $path data binding
+root = chart(bar, values=$scores, labels=$names)
+---
+{
+  "scores": [88.5, 92.3, 75.1],
+  "names": ["Alice", "Bob", "Carol"]
+}

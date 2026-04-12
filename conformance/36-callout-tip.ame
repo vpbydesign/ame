@@ -1,0 +1,3 @@
+// conformance/36-callout-tip.ame
+// Tests: tip callout
+root = callout(tip, "You can use Ctrl+Shift+P to open the command palette.")

@@ -532,4 +532,234 @@ class AmeNodeTest {
         val json = AmeSerializer.toJson(AmeNode.Divider)
         assertTrue(json.contains("\"_type\":\"divider\""), "Divider discriminator must be 'divider': $json")
     }
+
+    // ── v1.1 Chart Round-Trip ─────────────────────────────────────────
+
+    @Test
+    fun roundTripChart() {
+        val node = AmeNode.Chart(
+            type = ChartType.LINE,
+            values = listOf(1.0, 2.5, 3.0),
+            labels = listOf("Jan", "Feb", "Mar"),
+            series = listOf(listOf(1.0, 2.0), listOf(3.0, 4.0)),
+            height = 180,
+            color = SemanticColor.PRIMARY
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripChartDefaults() {
+        val node = AmeNode.Chart(type = ChartType.BAR)
+        assertRoundTrip(node)
+        val json = AmeSerializer.toJson(node)
+        assertTrue(!json.contains("\"height\""), "Default height=200 must be omitted: $json")
+        assertTrue(!json.contains("\"values\""), "Null values must be omitted: $json")
+        assertTrue(!json.contains("\"color\""), "Null color must be omitted: $json")
+    }
+
+    // ── v1.1 Code Round-Trip ──────────────────────────────────────────
+
+    @Test
+    fun roundTripCode() {
+        val node = AmeNode.Code(
+            language = "kotlin",
+            content = "fun main() = println(\"hello\")",
+            title = "Main.kt"
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripCodeDefaults() {
+        val node = AmeNode.Code(language = "text", content = "hello")
+        assertRoundTrip(node)
+        val json = AmeSerializer.toJson(node)
+        assertTrue(!json.contains("\"title\""), "Null title must be omitted: $json")
+    }
+
+    // ── v1.1 Accordion Round-Trip ─────────────────────────────────────
+
+    @Test
+    fun roundTripAccordion() {
+        val node = AmeNode.Accordion(
+            title = "Details",
+            children = listOf(AmeNode.Txt("Content")),
+            expanded = true
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripAccordionDefaults() {
+        val node = AmeNode.Accordion(title = "FAQ")
+        assertRoundTrip(node)
+        val json = AmeSerializer.toJson(node)
+        assertTrue(!json.contains("\"expanded\""), "Default expanded=false must be omitted: $json")
+    }
+
+    // ── v1.1 Carousel Round-Trip ──────────────────────────────────────
+
+    @Test
+    fun roundTripCarousel() {
+        val node = AmeNode.Carousel(
+            children = listOf(AmeNode.Txt("A"), AmeNode.Txt("B")),
+            peek = 32
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripCarouselDefaults() {
+        val node = AmeNode.Carousel()
+        assertRoundTrip(node)
+        val json = AmeSerializer.toJson(node)
+        assertTrue(!json.contains("\"peek\""), "Default peek=24 must be omitted: $json")
+    }
+
+    // ── v1.1 Callout Round-Trip ───────────────────────────────────────
+
+    @Test
+    fun roundTripCallout() {
+        val node = AmeNode.Callout(
+            type = CalloutType.WARNING,
+            content = "Be careful",
+            title = "Warning"
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripCalloutDefaults() {
+        val node = AmeNode.Callout(type = CalloutType.INFO, content = "Note")
+        assertRoundTrip(node)
+        val json = AmeSerializer.toJson(node)
+        assertTrue(!json.contains("\"title\""), "Null title must be omitted: $json")
+    }
+
+    // ── v1.1 Timeline/TimelineItem Round-Trip ─────────────────────────
+
+    @Test
+    fun roundTripTimeline() {
+        val node = AmeNode.Timeline(
+            children = listOf(
+                AmeNode.TimelineItem("Step 1", "Done", TimelineStatus.DONE),
+                AmeNode.TimelineItem("Step 2", null, TimelineStatus.ACTIVE)
+            )
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripTimelineItem() {
+        val node = AmeNode.TimelineItem(
+            title = "Shipped",
+            subtitle = "Package in transit",
+            status = TimelineStatus.DONE
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripTimelineItemDefaults() {
+        val node = AmeNode.TimelineItem(title = "Pending step")
+        assertRoundTrip(node)
+        val json = AmeSerializer.toJson(node)
+        assertTrue(!json.contains("\"status\""), "Default status=pending must be omitted: $json")
+        assertTrue(!json.contains("\"subtitle\""), "Null subtitle must be omitted: $json")
+    }
+
+    // ── v1.1 Txt/Badge Color Round-Trip ───────────────────────────────
+
+    @Test
+    fun roundTripTxtWithColor() {
+        val node = AmeNode.Txt("Alert", TxtStyle.BODY, color = SemanticColor.ERROR)
+        assertRoundTrip(node)
+        val json = AmeSerializer.toJson(node)
+        assertTrue(json.contains("\"color\":\"error\""), "Color must be serialized: $json")
+    }
+
+    @Test
+    fun roundTripTxtWithoutColor() {
+        val node = AmeNode.Txt("Normal", TxtStyle.BODY)
+        assertRoundTrip(node)
+        val json = AmeSerializer.toJson(node)
+        assertTrue(!json.contains("\"color\""), "Null color must be omitted: $json")
+    }
+
+    @Test
+    fun roundTripBadgeWithColor() {
+        val node = AmeNode.Badge("Live", BadgeVariant.SUCCESS, SemanticColor.SUCCESS)
+        assertRoundTrip(node)
+        val json = AmeSerializer.toJson(node)
+        assertTrue(json.contains("\"color\":\"success\""), "Color must be serialized: $json")
+    }
+
+    // ── v1.1 Enum Round-Trip ──────────────────────────────────────────
+
+    @Test
+    fun roundTripChartType() {
+        for (ct in ChartType.entries) {
+            val node = AmeNode.Chart(type = ct)
+            assertRoundTrip(node)
+        }
+    }
+
+    @Test
+    fun roundTripCalloutType() {
+        for (ct in CalloutType.entries) {
+            val node = AmeNode.Callout(type = ct, content = "test")
+            assertRoundTrip(node)
+        }
+    }
+
+    @Test
+    fun roundTripTimelineStatus() {
+        for (ts in TimelineStatus.entries) {
+            val node = AmeNode.TimelineItem(title = "test", status = ts)
+            assertRoundTrip(node)
+        }
+    }
+
+    @Test
+    fun roundTripSemanticColor() {
+        for (sc in SemanticColor.entries) {
+            val node = AmeNode.Txt("test", color = sc)
+            assertRoundTrip(node)
+        }
+    }
+
+    // ── v1.1 Complex Tree Round-Trip ──────────────────────────────────
+
+    @Test
+    fun roundTripTreeWithNewPrimitives() {
+        val tree = AmeNode.Col(
+            children = listOf(
+                AmeNode.Callout(type = CalloutType.TIP, content = "Hint", title = "Pro Tip"),
+                AmeNode.Accordion(
+                    title = "Details",
+                    children = listOf(
+                        AmeNode.Code(language = "json", content = "{\"key\":\"val\"}"),
+                        AmeNode.Chart(type = ChartType.SPARKLINE, values = listOf(1.0, 3.0, 2.0))
+                    ),
+                    expanded = true
+                ),
+                AmeNode.Carousel(
+                    children = listOf(
+                        AmeNode.Card(children = listOf(AmeNode.Txt("Slide 1"))),
+                        AmeNode.Card(children = listOf(AmeNode.Txt("Slide 2")))
+                    ),
+                    peek = 40
+                ),
+                AmeNode.Timeline(
+                    children = listOf(
+                        AmeNode.TimelineItem("Ordered", "April 1", TimelineStatus.DONE),
+                        AmeNode.TimelineItem("Shipped", null, TimelineStatus.ACTIVE),
+                        AmeNode.TimelineItem("Delivered", null, TimelineStatus.PENDING)
+                    )
+                )
+            )
+        )
+        assertRoundTrip(tree)
+    }
 }

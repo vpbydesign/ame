@@ -34,17 +34,17 @@ other LLM-initiated action.
 
 ## Why AME?
 
-- **Compact.** 1.62x fewer tokens than comparable UI syntaxes on average.
+- **Compact.** 1.77x fewer tokens than comparable UI syntaxes on average.
   Every token saved reduces latency and cost at scale.
   [Benchmark →](benchmarks/token-comparison.md)
 
 - **Streaming-first.** Line-oriented syntax enables progressive rendering —
   skeleton placeholders appear instantly, content fills in as each line
-  arrives. First visible content in ~0.17s.
+  arrives. First visible content in ~0.10s.
   [Benchmark →](benchmarks/streaming-latency.md)
 
-- **LLM-reliable.** Zero parse failures across both Gemini 3 Flash Preview
-  and Claude Sonnet 4.6 with the standard system prompt.
+- **LLM-reliable.** Zero parse failures across 32 prompts on both Gemini 3
+  Flash Preview and Claude Sonnet 4.6 with the standard system prompt.
   [Benchmark →](benchmarks/llm-reliability.md)
 
 - **Native mobile.** Jetpack Compose and SwiftUI renderers. Material 3
@@ -95,7 +95,7 @@ CompositionLocalProvider(LocalAmeTheme provides myThemeConfig) {
 
 | Dimension | AME | A2UI v0.9 | Raw JSON | MCP Apps | OpenUI Lang |
 |-----------|-----|-----------|----------|----------|-------------|
-| Token cost (avg) | 1x (baseline) | 1.62x | ~0.84x † | N/A (HTML) | ~0.95x \* |
+| Token cost (avg) | 1x (baseline) | 1.77x | ~0.87x † | N/A (HTML) | ~0.95x \* |
 | Streaming | Line-by-line | Flat list | Not streamable | Pre-built | Line-by-line |
 | Zero-token rendering | Yes | No | No | No | No |
 | Mobile-native renderer | Compose + SwiftUI | Flutter | Custom code | WebView | React |
@@ -105,7 +105,7 @@ CompositionLocalProvider(LocalAmeTheme provides myThemeConfig) {
 \* *OpenUI Lang token cost is estimated from syntax comparison, not measured
 via tokenizer. All other AME and A2UI numbers are measured.*
 
-† *Raw JSON is ~19% fewer tokens than AME on average, but is not
+† *Raw JSON is ~13% fewer tokens than AME on average, but is not
 incrementally parseable (no streaming), has no typed AST or error recovery,
 and requires custom rendering code per schema. AME's overhead pays for
 streaming progressiveness, a typed node tree with error recovery, and
@@ -116,12 +116,12 @@ documentation and measured token counts.
 
 ## Specification
 
-The complete AME v1.0 specification: [specification/v1.0/](specification/v1.0/README.md)
+The complete AME v1.1 specification: [specification/v1.0/](specification/v1.0/README.md)
 
 | Document | Description |
 |----------|-------------|
 | [syntax.md](specification/v1.0/syntax.md) | Line-oriented syntax rules and EBNF grammar |
-| [primitives.md](specification/v1.0/primitives.md) | 15 standard UI primitives with argument tables |
+| [primitives.md](specification/v1.0/primitives.md) | 21 standard UI primitives with argument tables |
 | [actions.md](specification/v1.0/actions.md) | 5 action types (tool, uri, nav, copy, submit) |
 | [streaming.md](specification/v1.0/streaming.md) | Progressive rendering with forward references |
 | [data-binding.md](specification/v1.0/data-binding.md) | $path references, --- separator, each() templates |
@@ -142,19 +142,24 @@ measured integer from the `countTokens` API — no estimates, no rounding.
 | Email Inbox (5 items) | 420 | 605 | 1.44x |
 | Booking Form (4 inputs) | 188 | 412 | 2.19x |
 | Comparison (2 cards) | 604 | 889 | 1.47x |
-| **Average** | **385** | **625** | **1.62x** |
+| Medical Dashboard (chart + timeline) | 218 | 743 | 3.41x |
+| Code Tutorial (code + accordion) | 294 | 554 | 1.88x |
+| Product Gallery (carousel + chart) | 436 | 664 | 1.52x |
+| **Average** | **359** | **636** | **1.77x** |
 
 [Full benchmark with methodology and reproducible strings →](benchmarks/token-comparison.md)
 
 ### Streaming Latency
 
-First visible content in ~0.17s vs ~16.9s for flat-list alternatives
-(simulated at 100 tokens/s).
+First visible content in ~0.10s vs ~10.1s for batch-rendered JSON alternatives
+(simulated at 100 tokens/s). A2UI streaming JSON parsers can narrow the
+first-content gap to ~0.5s, but AME retains structural advantages (skeleton
+placeholders, simpler parser, 1.75x fewer tokens).
 [Full benchmark →](benchmarks/streaming-latency.md)
 
 ### LLM Reliability
 
-Zero parse failures and zero validity errors across 20 prompts on both
+Zero parse failures across 32 prompts (20 v1.0 + 12 v1.1) on both
 Gemini 3 Flash Preview and Claude Sonnet 4.6.
 [Full benchmark →](benchmarks/llm-reliability.md)
 
@@ -164,31 +169,25 @@ Gemini 3 Flash Preview and Claude Sonnet 4.6.
 ame-spec/
 ├── specification/v1.0/   # 7 spec documents (syntax, primitives, actions, streaming, data-binding, tier-zero, integration)
 ├── ame-core/              # Kotlin data model + parser (AmeNode, AmeAction, AmeParser, AmeSerializer)
-├── ame-compose/           # Jetpack Compose renderer (AmeRenderer, AmeTheme, AmeFormState, AmeIcons)
+├── ame-compose/           # Jetpack Compose renderer (AmeRenderer, AmeTheme, AmeFormState, AmeIcons, AmeChartRenderer)
 ├── ame-swiftui/           # SwiftUI renderer (AmeRenderer, AmeTheme, AmeFormState, AmeIcons)
+├── conformance/           # 55 conformance tests with Kotlin-Swift parity check
 ├── benchmarks/            # Token comparison, streaming latency, LLM reliability
-└── examples/              # 5 standalone .ame files
+└── examples/              # 9 standalone .ame files
 ```
 
 ## Known Limitations
 
-AME v1.0 is the initial release of the specification. The following
-limitations are known and planned for future versions:
+The following limitations are known and planned for future versions:
 
 1. **Single tokenizer benchmark.** All token measurements in
    [token-comparison.md](benchmarks/token-comparison.md) use the Gemini
    `gemini-2.0-flash` tokenizer. GPT-4o and Claude tokenizers have different
-   vocabulary tables and BPE merge rules. The 1.62x ratio is specific to
+   vocabulary tables and BPE merge rules. The 1.77x ratio is specific to
    the Gemini tokenizer and may vary on other tokenizers. Community
    contributions of cross-tokenizer benchmarks are welcome.
 
-2. **Conformance test suite.** v1.0 includes a foundation conformance suite
-   (`conformance/` directory) with 12 `.ame` input files and expected JSON
-   output trees, verified against both Kotlin and Swift parsers via automated
-   parity check. A comprehensive test suite with full coverage matrix is
-   planned for v1.1.
-
-3. **Grammar disambiguation.** The EBNF grammar in
+2. **Grammar disambiguation.** The EBNF grammar in
    [syntax.md](specification/v1.0/syntax.md) relies on a prose
    disambiguation rule for `row()`'s second positional argument (numeric
    literal = `gap`, enum identifier = `align`). This rule is specified in
@@ -196,19 +195,20 @@ limitations are known and planned for future versions:
    in EBNF alone. Parser implementors MUST read the `row` section in
    primitives.md for the complete disambiguation rule.
 
-4. **Custom component catalog schema.** The spec defines how to declare
+3. **Custom component catalog schema.** The spec defines how to declare
    custom components in `AME_CATALOG`
    ([integration.md](specification/v1.0/integration.md)) but does not define
    a schema format for describing custom component parameters to agents.
    Host apps document their custom components in their system prompts. A
-   formal custom catalog schema is planned for v1.1.
+   formal custom catalog schema is planned for a future version.
 
-5. **Two independent parsers.** The reference implementation includes
+4. **Two independent parsers.** The reference implementation includes
    independent Kotlin and Swift parsers that must produce identical output.
    Parser parity is enforced by the conformance test suite
-   (`conformance/check-parity.sh`). Both parsers implement `each()` expansion
-   at parse time — in streaming mode, `each()` nodes show a shimmer
-   placeholder until the data section arrives.
+   (`conformance/check-parity.sh`) with 55 test cases covering all 21
+   primitives. Both parsers implement `each()` expansion at parse time — in
+   streaming mode, `each()` nodes show a shimmer placeholder until the data
+   section arrives.
 
 ## License
 

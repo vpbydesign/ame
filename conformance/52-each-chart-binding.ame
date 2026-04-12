@@ -1,0 +1,19 @@
+// conformance/52-each-chart-binding.ame
+// Tests: chart inside each() with per-item $path data binding
+root = col([title, charts])
+title = txt("Department Scores", headline)
+charts = each($departments, dept_tpl)
+dept_tpl = chart(bar, values=$scores, labels=$categories)
+---
+{
+  "departments": [
+    {
+      "scores": [85.5, 90.2, 78.3],
+      "categories": ["Q1", "Q2", "Q3"]
+    },
+    {
+      "scores": [92.1, 88.4, 95.7],
+      "categories": ["Q1", "Q2", "Q3"]
+    }
+  ]
+}

@@ -4,7 +4,7 @@ import XCTest
 /// Round-trip serialization tests for all AmeNode and AmeAction types.
 /// Verifies: serialize to JSON -> deserialize back -> assertEqual on original.
 ///
-/// Port of AmeNodeTest.kt (535 lines, 50 tests).
+/// Port of AmeNodeTest.kt — v1.1 parity.
 final class AmeNodeTests: XCTestCase {
 
     // MARK: - Helpers
@@ -481,7 +481,7 @@ final class AmeNodeTests: XCTestCase {
         XCTAssertEqual(headerAlign, .spaceBetween)
         XCTAssertEqual(headerChildren.count, 2)
 
-        guard case .txt(let cityText, let cityStyle, _) = headerChildren[0] else {
+        guard case .txt(let cityText, let cityStyle, _, _) = headerChildren[0] else {
             XCTFail("Expected txt for city")
             return
         }
@@ -496,7 +496,7 @@ final class AmeNodeTests: XCTestCase {
         XCTAssertEqual(iconSize, 28)
 
         // temp
-        guard case .txt(let tempText, let tempStyle, _) = children[1] else {
+        guard case .txt(let tempText, let tempStyle, _, _) = children[1] else {
             XCTFail("Expected txt for temp")
             return
         }
@@ -504,7 +504,7 @@ final class AmeNodeTests: XCTestCase {
         XCTAssertEqual(tempStyle, .display)
 
         // condition
-        guard case .txt(let condText, let condStyle, _) = children[2] else {
+        guard case .txt(let condText, let condStyle, _, _) = children[2] else {
             XCTFail("Expected txt for condition")
             return
         }
@@ -545,5 +545,304 @@ final class AmeNodeTests: XCTestCase {
 
     func testUnknownIconReturnsFallback() {
         XCTAssertEqual(AmeIcons.resolve("nonexistent"), "questionmark.circle")
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // v1.1 Primitives — Codable Round-Trip Tests
+    // ════════════════════════════════════════════════════════════════════
+
+    func testChartCodableRoundTrip() {
+        let node = AmeNode.chart(type: .bar, values: [10, 20, 30], labels: ["A", "B", "C"],
+                                 height: 250, color: .primary)
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .chart(let type, let values, let labels, _, let height, let color, _, _, _) = decoded else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .bar)
+        XCTAssertEqual(values, [10, 20, 30])
+        XCTAssertEqual(labels, ["A", "B", "C"])
+        XCTAssertEqual(height, 250)
+        XCTAssertEqual(color, .primary)
+    }
+
+    func testChartDefaultsCodable() {
+        let node = AmeNode.chart(type: .line)
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .chart(let type, let values, let labels, let series, let height, let color, _, _, _) = decoded else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .line)
+        XCTAssertNil(values)
+        XCTAssertNil(labels)
+        XCTAssertNil(series)
+        XCTAssertEqual(height, 200)
+        XCTAssertNil(color)
+    }
+
+    func testChartMultiSeriesCodable() {
+        let node = AmeNode.chart(type: .line, series: [[1, 2], [3, 4]])
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .chart(_, _, _, let series, _, _, _, _, _) = decoded else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(series, [[1, 2], [3, 4]])
+    }
+
+    func testCodeCodableRoundTrip() {
+        let node = AmeNode.code(language: "swift", content: "let x = 1", title: "Example")
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .code(let language, let content, let title) = decoded else {
+            XCTFail("Expected code"); return
+        }
+        XCTAssertEqual(language, "swift")
+        XCTAssertEqual(content, "let x = 1")
+        XCTAssertEqual(title, "Example")
+    }
+
+    func testCodeNoTitleCodable() {
+        let node = AmeNode.code(language: "python", content: "print()")
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .code(_, _, let title) = decoded else {
+            XCTFail("Expected code"); return
+        }
+        XCTAssertNil(title)
+    }
+
+    func testAccordionCodableRoundTrip() {
+        let node = AmeNode.accordion(title: "FAQ", children: [.txt(text: "Answer")], expanded: true)
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .accordion(let title, let children, let expanded) = decoded else {
+            XCTFail("Expected accordion"); return
+        }
+        XCTAssertEqual(title, "FAQ")
+        XCTAssertEqual(children.count, 1)
+        XCTAssertTrue(expanded)
+    }
+
+    func testAccordionDefaultsCodable() {
+        let node = AmeNode.accordion(title: "Section")
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .accordion(_, let children, let expanded) = decoded else {
+            XCTFail("Expected accordion"); return
+        }
+        XCTAssertTrue(children.isEmpty)
+        XCTAssertFalse(expanded)
+    }
+
+    func testCarouselCodableRoundTrip() {
+        let node = AmeNode.carousel(children: [.txt(text: "Slide 1"), .txt(text: "Slide 2")], peek: 40)
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .carousel(let children, let peek) = decoded else {
+            XCTFail("Expected carousel"); return
+        }
+        XCTAssertEqual(children.count, 2)
+        XCTAssertEqual(peek, 40)
+    }
+
+    func testCarouselDefaultsCodable() {
+        let node = AmeNode.carousel()
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .carousel(let children, let peek) = decoded else {
+            XCTFail("Expected carousel"); return
+        }
+        XCTAssertTrue(children.isEmpty)
+        XCTAssertEqual(peek, 24)
+    }
+
+    func testCalloutCodableRoundTrip() {
+        let node = AmeNode.callout(type: .warning, content: "Be careful", title: "Warning")
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .callout(let type, let content, let title) = decoded else {
+            XCTFail("Expected callout"); return
+        }
+        XCTAssertEqual(type, .warning)
+        XCTAssertEqual(content, "Be careful")
+        XCTAssertEqual(title, "Warning")
+    }
+
+    func testCalloutNoTitleCodable() {
+        let node = AmeNode.callout(type: .info, content: "Note this")
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .callout(let type, _, let title) = decoded else {
+            XCTFail("Expected callout"); return
+        }
+        XCTAssertEqual(type, .info)
+        XCTAssertNil(title)
+    }
+
+    func testTimelineCodableRoundTrip() {
+        let node = AmeNode.timeline(children: [
+            .timelineItem(title: "Step 1", subtitle: "Done", status: .done),
+            .timelineItem(title: "Step 2", status: .active)
+        ])
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .timeline(let children) = decoded else {
+            XCTFail("Expected timeline"); return
+        }
+        XCTAssertEqual(children.count, 2)
+        guard case .timelineItem(let t1, let s1, let st1) = children[0] else {
+            XCTFail("Expected timeline_item"); return
+        }
+        XCTAssertEqual(t1, "Step 1")
+        XCTAssertEqual(s1, "Done")
+        XCTAssertEqual(st1, .done)
+    }
+
+    func testTimelineItemCodableRoundTrip() {
+        let node = AmeNode.timelineItem(title: "Deploy", subtitle: "Running", status: .active)
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .timelineItem(let title, let subtitle, let status) = decoded else {
+            XCTFail("Expected timeline_item"); return
+        }
+        XCTAssertEqual(title, "Deploy")
+        XCTAssertEqual(subtitle, "Running")
+        XCTAssertEqual(status, .active)
+    }
+
+    func testTimelineItemDefaultsCodable() {
+        let node = AmeNode.timelineItem(title: "Waiting")
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .timelineItem(_, let subtitle, let status) = decoded else {
+            XCTFail("Expected timeline_item"); return
+        }
+        XCTAssertNil(subtitle)
+        XCTAssertEqual(status, .pending)
+    }
+
+    func testTxtWithColorCodable() {
+        let node = AmeNode.txt(text: "Error msg", style: .body, color: .error)
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .txt(let text, _, _, let color) = decoded else {
+            XCTFail("Expected txt"); return
+        }
+        XCTAssertEqual(text, "Error msg")
+        XCTAssertEqual(color, .error)
+    }
+
+    func testTxtWithoutColorCodable() {
+        let node = AmeNode.txt(text: "Plain")
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .txt(_, _, _, let color) = decoded else {
+            XCTFail("Expected txt"); return
+        }
+        XCTAssertNil(color)
+    }
+
+    func testBadgeWithColorCodable() {
+        let node = AmeNode.badge(label: "Alert", variant: .default, color: .warning)
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .badge(let label, _, let color) = decoded else {
+            XCTFail("Expected badge"); return
+        }
+        XCTAssertEqual(label, "Alert")
+        XCTAssertEqual(color, .warning)
+    }
+
+    func testBadgeWithoutColorCodable() {
+        let node = AmeNode.badge(label: "Tag")
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .badge(_, _, let color) = decoded else {
+            XCTFail("Expected badge"); return
+        }
+        XCTAssertNil(color)
+    }
+
+    func testChartSparklineCodable() {
+        let node = AmeNode.chart(type: .sparkline, values: [1, 2, 3])
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .chart(let type, let values, _, _, _, _, _, _, _) = decoded else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .sparkline)
+        XCTAssertEqual(values, [1, 2, 3])
+    }
+
+    func testChartPieCodable() {
+        let node = AmeNode.chart(type: .pie, values: [30, 40, 30], color: .success)
+        let json = AmeSerializer.toJson(node)!
+        let decoded = AmeSerializer.fromJson(json)!
+        guard case .chart(let type, let values, _, _, _, let color, _, _, _) = decoded else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .pie)
+        XCTAssertEqual(values, [30, 40, 30])
+        XCTAssertEqual(color, .success)
+    }
+
+    func testAllCalloutTypes() {
+        for calloutType in CalloutType.allCases {
+            let node = AmeNode.callout(type: calloutType, content: "Test")
+            let json = AmeSerializer.toJson(node)!
+            let decoded = AmeSerializer.fromJson(json)!
+            guard case .callout(let decodedType, _, _) = decoded else {
+                XCTFail("Expected callout for type \(calloutType)"); return
+            }
+            XCTAssertEqual(decodedType, calloutType)
+        }
+    }
+
+    func testAllTimelineStatuses() {
+        for status in TimelineStatus.allCases {
+            let node = AmeNode.timelineItem(title: "Step", status: status)
+            let json = AmeSerializer.toJson(node)!
+            let decoded = AmeSerializer.fromJson(json)!
+            guard case .timelineItem(_, _, let decodedStatus) = decoded else {
+                XCTFail("Expected timeline_item for status \(status)"); return
+            }
+            XCTAssertEqual(decodedStatus, status)
+        }
+    }
+
+    func testRoundTripChartType() {
+        for ct in ChartType.allCases {
+            let node = AmeNode.chart(type: ct)
+            assertRoundTrip(node)
+        }
+    }
+
+    func testRoundTripSemanticColor() {
+        for sc in SemanticColor.allCases {
+            let node = AmeNode.txt(text: "test", color: sc)
+            assertRoundTrip(node)
+        }
+    }
+
+    func testRoundTripTreeWithNewPrimitives() {
+        let tree = AmeNode.col(children: [
+            .callout(type: .tip, content: "Hint", title: "Pro Tip"),
+            .accordion(title: "Details", children: [
+                .code(language: "json", content: "{\"key\":\"val\"}"),
+                .chart(type: .sparkline, values: [1, 3, 2])
+            ], expanded: true),
+            .carousel(children: [
+                .card(children: [.txt(text: "Slide 1")]),
+                .card(children: [.txt(text: "Slide 2")])
+            ], peek: 40),
+            .timeline(children: [
+                .timelineItem(title: "Ordered", subtitle: "April 1", status: .done),
+                .timelineItem(title: "Shipped", status: .active),
+                .timelineItem(title: "Delivered", status: .pending)
+            ])
+        ])
+        assertRoundTrip(tree)
     }
 }

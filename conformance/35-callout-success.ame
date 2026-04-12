@@ -1,0 +1,3 @@
+// conformance/35-callout-success.ame
+// Tests: success callout
+root = callout(success, "Your payment was processed successfully.")

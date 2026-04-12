@@ -1,9 +1,10 @@
 import SwiftUI
+import Charts
 
 /// Recursive SwiftUI View that renders any AmeNode tree as native iOS UI.
 ///
 /// This is the main entry point for the AME SwiftUI renderer. It dispatches
-/// to type-specific private views via an exhaustive `switch` over all 17
+/// to type-specific private views via an exhaustive `switch` over all 24
 /// AmeNode cases. The Swift compiler enforces exhaustiveness — adding a new
 /// case to AmeNode will cause a compile error here until a rendering branch
 /// is added.
@@ -47,8 +48,8 @@ public struct AmeRenderer: View {
             renderCol(children, align: align)
         case .row(let children, let align, let gap):
             renderRow(children, align: align, gap: gap)
-        case .txt(let text, let style, let maxLines):
-            renderTxt(text, style: style, maxLines: maxLines)
+        case .txt(let text, let style, let maxLines, let color):
+            renderTxt(text, style: style, maxLines: maxLines, color: color)
         case .img(let url, let height):
             renderImg(url, height: height)
         case .icon(let name, let size):
@@ -59,8 +60,8 @@ public struct AmeRenderer: View {
             Spacer().frame(height: CGFloat(height))
         case .card(let children, let elevation):
             renderCard(children, elevation: elevation)
-        case .badge(let label, let variant):
-            renderBadge(label, variant: variant)
+        case .badge(let label, let variant, let color):
+            renderBadge(label, variant: variant, color: color)
         case .progress(let value, let label):
             renderProgress(value, label: label)
         case .btn(let label, let action, let style, let icon):
@@ -73,11 +74,22 @@ public struct AmeRenderer: View {
             renderDataList(children, dividers: dividers)
         case .table(let headers, let rows):
             renderTable(headers, rows: rows)
+        case .chart(let type, let values, _, let series, let height, let color, _, _, _):
+            renderChart(type: type, values: values, series: series, height: height, color: color)
+        case .code(let language, let content, let title):
+            renderCode(language: language, content: content, title: title)
+        case .accordion(let title, let children, let expanded):
+            renderAccordion(title: title, children: children, expanded: expanded)
+        case .carousel(let children, let peek):
+            renderCarousel(children: children, peek: peek)
+        case .callout(let type, let content, let title):
+            renderCallout(type: type, content: content, title: title)
+        case .timeline(let children):
+            renderTimeline(children: children)
+        case .timelineItem(let title, let subtitle, let status):
+            renderTimelineItem(title: title, subtitle: subtitle, status: status)
         case .ref:
             AmeSkeleton()
-        // Streaming fallback: when a data section is present, the parser expands
-        // each() at parse time and this case is never reached. This path is only hit
-        // during streaming mode when the data model has not yet arrived.
         case .each:
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.gray.opacity(0.2))
@@ -136,15 +148,17 @@ public struct AmeRenderer: View {
     // MARK: - Content Primitives
 
     @ViewBuilder
-    private func renderTxt(_ text: String, style: TxtStyle, maxLines: Int?) -> some View {
+    private func renderTxt(_ text: String, style: TxtStyle, maxLines: Int?, color: SemanticColor?) -> some View {
         if style == .overline {
             Text(text)
                 .font(AmeTheme.font(style))
+                .foregroundStyle(color.map { AmeTheme.semanticColor($0) } ?? .primary)
                 .textCase(.uppercase)
                 .lineLimit(maxLines)
         } else {
             Text(text)
                 .font(AmeTheme.font(style))
+                .foregroundStyle(color.map { AmeTheme.semanticColor($0) } ?? .primary)
                 .lineLimit(maxLines)
         }
     }
@@ -209,13 +223,13 @@ public struct AmeRenderer: View {
     }
 
     @ViewBuilder
-    private func renderBadge(_ label: String, variant: BadgeVariant) -> some View {
+    private func renderBadge(_ label: String, variant: BadgeVariant, color: SemanticColor?) -> some View {
         Text(label)
             .font(.caption2)
-            .foregroundColor(AmeTheme.badgeTextColor(variant))
+            .foregroundColor(color.map { AmeTheme.semanticColor($0) } ?? AmeTheme.badgeTextColor(variant))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(AmeTheme.badgeColor(variant))
+            .background(color.map { AmeTheme.semanticColor($0).opacity(0.2) } ?? AmeTheme.badgeColor(variant))
             .cornerRadius(4)
     }
 
@@ -353,6 +367,249 @@ public struct AmeRenderer: View {
         }
     }
 
+    // MARK: - Visualization Primitives
+
+    @ViewBuilder
+    private func renderChart(type: ChartType, values: [Double]?, series: [[Double]]?,
+                             height: Int, color: SemanticColor?) -> some View {
+        let data = values ?? []
+        let chartColor = color.map { AmeTheme.semanticColor($0) } ?? .accentColor
+        if data.isEmpty && (series ?? []).isEmpty {
+            Text("No chart data")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            switch type {
+            case .bar:
+                Chart {
+                    ForEach(Array(data.enumerated()), id: \.offset) { index, value in
+                        BarMark(
+                            x: .value("Index", index),
+                            y: .value("Value", value)
+                        )
+                        .foregroundStyle(chartColor)
+                    }
+                }
+                .frame(height: CGFloat(height))
+
+            case .line:
+                Chart {
+                    let allSeries: [[Double]] = series ?? (data.isEmpty ? [] : [data])
+                    ForEach(Array(allSeries.enumerated()), id: \.offset) { seriesIdx, seriesData in
+                        ForEach(Array(seriesData.enumerated()), id: \.offset) { index, value in
+                            LineMark(
+                                x: .value("Index", index),
+                                y: .value("Value", value)
+                            )
+                            .foregroundStyle(by: .value("Series", "Series \(seriesIdx)"))
+                        }
+                    }
+                }
+                .chartForegroundStyleScale(range: [chartColor, chartColor.opacity(0.6)])
+                .frame(height: CGFloat(height))
+
+            case .pie:
+                if #available(iOS 17.0, macOS 14.0, *) {
+                    Chart {
+                        ForEach(Array(data.enumerated()), id: \.offset) { index, value in
+                            SectorMark(
+                                angle: .value("Value", value)
+                            )
+                            .foregroundStyle(by: .value("Slice", "Slice \(index)"))
+                        }
+                    }
+                    .frame(height: CGFloat(height))
+                } else {
+                    Chart {
+                        ForEach(Array(data.enumerated()), id: \.offset) { index, value in
+                            BarMark(
+                                x: .value("Slice", "Slice \(index)"),
+                                y: .value("Value", value)
+                            )
+                            .foregroundStyle(by: .value("Slice", "Slice \(index)"))
+                        }
+                    }
+                    .frame(height: CGFloat(height))
+                }
+
+            case .sparkline:
+                Chart {
+                    ForEach(Array(data.enumerated()), id: \.offset) { index, value in
+                        LineMark(
+                            x: .value("Index", index),
+                            y: .value("Value", value)
+                        )
+                        .foregroundStyle(chartColor)
+                    }
+                }
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                .frame(height: CGFloat(height))
+            }
+        }
+    }
+
+    // MARK: - Rich Content Primitives
+
+    @ViewBuilder
+    private func renderCode(language: String, content: String, title: String?) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(title ?? language)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    #if os(iOS)
+                    UIPasteboard.general.string = content
+                    #elseif os(macOS)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(content, forType: .string)
+                    #endif
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(content)
+                    .font(.system(.body, design: .monospaced))
+                    #if os(iOS)
+                    .foregroundStyle(Color(.label))
+                    #else
+                    .foregroundStyle(Color.primary)
+                    #endif
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+            }
+        }
+        #if os(iOS)
+        .background(Color(.systemGray6))
+        #else
+        .background(Color.gray.opacity(0.1))
+        #endif
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: - Disclosure Primitives
+
+    @ViewBuilder
+    private func renderAccordion(title: String, children: [AmeNode], expanded: Bool) -> some View {
+        AmeAccordionView(title: title, children: children, initialExpanded: expanded,
+                         formState: formState, onAction: onAction, depth: depth)
+    }
+
+    @ViewBuilder
+    private func renderCarousel(children: [AmeNode], peek: Int) -> some View {
+        if children.isEmpty {
+            EmptyView()
+        } else {
+            GeometryReader { geometry in
+                let itemWidth = geometry.size.width * 0.85
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 12) {
+                        ForEach(Array(children.enumerated()), id: \.offset) { _, child in
+                            AmeRenderer(node: child, formState: formState, onAction: onAction, depth: depth + 1)
+                                .frame(width: itemWidth)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+            .frame(height: 200)
+        }
+    }
+
+    // MARK: - Alert Primitives
+
+    @ViewBuilder
+    private func renderCallout(type: CalloutType, content: String, title: String?) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: AmeTheme.calloutIcon(type))
+                .foregroundStyle(AmeTheme.calloutTint(type))
+                .font(.title3)
+            VStack(alignment: .leading, spacing: 4) {
+                if let title {
+                    Text(title).font(.headline)
+                }
+                Text(content).font(.body)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(AmeTheme.calloutBackground(type))
+        )
+    }
+
+    // MARK: - Sequence Primitives
+
+    @ViewBuilder
+    private func renderTimeline(children: [AmeNode]) -> some View {
+        if children.isEmpty {
+            EmptyView()
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(children.enumerated()), id: \.offset) { index, child in
+                    if case .timelineItem(let title, let subtitle, let status) = child {
+                        HStack(alignment: .top, spacing: 12) {
+                            VStack(spacing: 0) {
+                                Circle()
+                                    .fill(AmeTheme.timelineCircleColor(status))
+                                    .frame(width: 12, height: 12)
+                                if index < children.count - 1 {
+                                    if AmeTheme.timelineIsDashed(status) {
+                                        Rectangle()
+                                            .fill(.clear)
+                                            .frame(width: 2)
+                                            .overlay(
+                                                GeometryReader { geo in
+                                                    Path { path in
+                                                        path.move(to: CGPoint(x: 1, y: 0))
+                                                        path.addLine(to: CGPoint(x: 1, y: geo.size.height))
+                                                    }
+                                                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                                                    .foregroundStyle(AmeTheme.timelineLineColor(status))
+                                                }
+                                            )
+                                    } else {
+                                        Rectangle()
+                                            .fill(AmeTheme.timelineLineColor(status))
+                                            .frame(width: 2)
+                                    }
+                                }
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(title).font(.subheadline).fontWeight(.medium)
+                                if let sub = subtitle, !sub.isEmpty {
+                                    Text(sub).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.bottom, 16)
+                        }
+                    } else {
+                        AmeRenderer(node: child, formState: formState, onAction: onAction, depth: depth + 1)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func renderTimelineItem(title: String, subtitle: String?, status: TimelineStatus) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.subheadline).fontWeight(.medium)
+            if let sub = subtitle, !sub.isEmpty {
+                Text(sub).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
     // MARK: - Alignment Helpers
 
     private func mapHorizontalAlignment(_ align: Align) -> HorizontalAlignment {
@@ -370,6 +627,35 @@ public struct AmeRenderer: View {
         case .center: return .center
         case .end: return .trailing
         case .spaceBetween, .spaceAround: return .leading
+        }
+    }
+}
+
+// MARK: - Accordion View (requires @State for expand/collapse)
+
+private struct AmeAccordionView: View {
+    let title: String
+    let children: [AmeNode]
+    @State var isExpanded: Bool
+    let formState: AmeFormState
+    let onAction: (AmeAction) -> Void
+    let depth: Int
+
+    init(title: String, children: [AmeNode], initialExpanded: Bool,
+         formState: AmeFormState, onAction: @escaping (AmeAction) -> Void, depth: Int) {
+        self.title = title
+        self.children = children
+        self._isExpanded = State(initialValue: initialExpanded)
+        self.formState = formState
+        self.onAction = onAction
+        self.depth = depth
+    }
+
+    var body: some View {
+        DisclosureGroup(title, isExpanded: $isExpanded) {
+            ForEach(Array(children.enumerated()), id: \.offset) { _, child in
+                AmeRenderer(node: child, formState: formState, onAction: onAction, depth: depth + 1)
+            }
         }
     }
 }

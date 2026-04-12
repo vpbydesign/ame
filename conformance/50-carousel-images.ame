@@ -1,0 +1,6 @@
+// conformance/50-carousel-images.ame
+// Tests: carousel containing images
+root = carousel([p1, p2, p3])
+p1 = img("https://example.com/beach.jpg", 200)
+p2 = img("https://example.com/mountain.jpg", 200)
+p3 = img("https://example.com/forest.jpg", 200)

@@ -1,0 +1,6 @@
+// conformance/29-carousel-basic.ame
+// Tests: basic carousel with multiple children
+root = carousel([c1, c2, c3])
+c1 = img("https://example.com/1.jpg")
+c2 = img("https://example.com/2.jpg")
+c3 = img("https://example.com/3.jpg")

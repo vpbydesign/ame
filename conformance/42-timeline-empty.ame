@@ -1,0 +1,3 @@
+// conformance/42-timeline-empty.ame
+// Tests: timeline with empty children (edge case)
+root = timeline([])

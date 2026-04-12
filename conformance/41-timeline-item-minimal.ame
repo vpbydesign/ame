@@ -1,0 +1,5 @@
+// conformance/41-timeline-item-minimal.ame
+// Tests: timeline_item with only title (defaults: no subtitle, pending status)
+root = timeline([s1, s2])
+s1 = timeline_item("Step One")
+s2 = timeline_item("Step Two")

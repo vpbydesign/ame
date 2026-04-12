@@ -1,0 +1,16 @@
+// code-tutorial.ame
+// Scenario: Getting started tutorial with code snippets in expandable steps
+// Lines: 13 | Tokens: 294 (measured via Gemini gemini-2.0-flash)
+// v1.1 primitives: code, accordion
+//
+root = col([tut_title, step1, step2, step3])
+tut_title = txt("Getting Started with AME", headline)
+step1 = accordion("1. Define Your Root", [s1_code, s1_note])
+s1_code = code("kotlin", "val parser = AmeParser()\nparser.feed(\"root = col([greeting])\")\nparser.feed(\"greeting = txt(\\\"Hello!\\\", headline)\")")
+s1_note = txt("The root identifier is the entry point of your UI tree.", caption)
+step2 = accordion("2. Parse and Render", [s2_code, s2_note])
+s2_code = code("kotlin", "val tree = parser.getResolvedTree()\nAmeRenderer(tree)")
+s2_note = txt("getResolvedTree() resolves all forward references.", caption)
+step3 = accordion("3. Handle Actions", [s3_code, s3_note])
+s3_code = code("kotlin", "AmeActionHandler { action ->\n    when (action) {\n        is AmeAction.Tool -> callTool(action)\n        is AmeAction.Uri -> openUri(action.uri)\n    }\n}")
+s3_note = txt("Actions are dispatched through a single handler.", caption)

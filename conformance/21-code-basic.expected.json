@@ -1,0 +1,1 @@
+{"_type":"code","content":"def hello():\n    print(\"Hello, World!\")","language":"python"}

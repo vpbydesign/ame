@@ -6,9 +6,11 @@ import kotlinx.serialization.Serializable
 /**
  * Sealed interface representing all AME UI node types.
  *
- * 15 visual primitives (matching primitives.md exactly),
+ * 21 visual primitives (matching primitives.md exactly),
  * 1 streaming forward reference (Ref),
  * 1 data iteration construct (Each).
+ *
+ * 24 subtypes total: 21 visual + Divider object + Ref + Each.
  *
  * Children are List<AmeNode> (resolved tree form). The parser converts
  * identifier strings to Ref nodes during parsing, then resolves Ref -> real
@@ -57,7 +59,8 @@ sealed interface AmeNode {
     data class Txt(
         val text: String,
         val style: TxtStyle = TxtStyle.BODY,
-        val maxLines: Int? = null
+        val maxLines: Int? = null,
+        val color: SemanticColor? = null
     ) : AmeNode
 
     /** Image loaded from a URL. Width fills available space. */
@@ -103,7 +106,8 @@ sealed interface AmeNode {
     @SerialName("badge")
     data class Badge(
         val label: String,
-        val variant: BadgeVariant = BadgeVariant.DEFAULT
+        val variant: BadgeVariant = BadgeVariant.DEFAULT,
+        val color: SemanticColor? = null
     ) : AmeNode
 
     /** Horizontal progress bar with optional label. Value clamped to 0.0–1.0. */
@@ -171,6 +175,99 @@ sealed interface AmeNode {
     data class Table(
         val headers: List<String>,
         val rows: List<List<String>>
+    ) : AmeNode
+
+    // ── Visualization Primitives ──────────────────────────────────────
+
+    /**
+     * Data visualization chart. Supports line, bar, pie, and sparkline types.
+     * [values] is the primary data series. [series] overrides [values] for
+     * multi-series charts. Both accept $path references to data model arrays.
+     *
+     * [valuesPath], [labelsPath], [seriesPath] store unresolved $path references
+     * when data binding is deferred. After resolveTree, these are null and
+     * the resolved data populates [values], [labels], [series].
+     */
+    @Serializable
+    @SerialName("chart")
+    data class Chart(
+        val type: ChartType,
+        val values: List<Double>? = null,
+        val labels: List<String>? = null,
+        val series: List<List<Double>>? = null,
+        val height: Int = 200,
+        val color: SemanticColor? = null,
+        val valuesPath: String? = null,
+        val labelsPath: String? = null,
+        val seriesPath: String? = null
+    ) : AmeNode
+
+    // ── Rich Content Primitives ───────────────────────────────────────
+
+    /**
+     * Syntax-highlighted code block with copy affordance.
+     * [content] uses standard AME string escaping (\n, \t, \\, \").
+     */
+    @Serializable
+    @SerialName("code")
+    data class Code(
+        val language: String,
+        val content: String,
+        val title: String? = null
+    ) : AmeNode
+
+    // ── Disclosure Primitives ─────────────────────────────────────────
+
+    /**
+     * Collapsible section. Header is always visible; children toggle on tap.
+     * [expanded] is the initial state, not a reactive binding.
+     */
+    @Serializable
+    @SerialName("accordion")
+    data class Accordion(
+        val title: String,
+        val children: List<AmeNode> = emptyList(),
+        val expanded: Boolean = false
+    ) : AmeNode
+
+    /** Horizontally scrollable container. [peek] is dp of next item visible. */
+    @Serializable
+    @SerialName("carousel")
+    data class Carousel(
+        val children: List<AmeNode> = emptyList(),
+        val peek: Int = 24
+    ) : AmeNode
+
+    // ── Alert Primitives ──────────────────────────────────────────────
+
+    /**
+     * Visually distinct alert/info box with type-specific icon and tint.
+     * [type] determines the icon, background color, and semantic meaning.
+     */
+    @Serializable
+    @SerialName("callout")
+    data class Callout(
+        val type: CalloutType,
+        val content: String,
+        val title: String? = null
+    ) : AmeNode
+
+    // ── Sequence Primitives ───────────────────────────────────────────
+
+    /** Ordered vertical event sequence with status connectors. */
+    @Serializable
+    @SerialName("timeline")
+    data class Timeline(
+        val children: List<AmeNode> = emptyList()
+    ) : AmeNode
+
+    /** Single step in a timeline. Not rendered standalone. */
+    @Serializable
+    @SerialName("timeline_item")
+    data class TimelineItem(
+        val title: String,
+        val subtitle: String? = null,
+        val status: TimelineStatus = TimelineStatus.PENDING
     ) : AmeNode
 
     // ── Structural Types (non-visual) ──────────────────────────────────

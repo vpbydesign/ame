@@ -1,0 +1,3 @@
+// conformance/28-accordion-empty.ame
+// Tests: accordion with empty children (edge case)
+root = accordion("Empty Section", [])

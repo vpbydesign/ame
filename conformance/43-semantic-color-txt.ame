@@ -1,0 +1,6 @@
+// conformance/43-semantic-color-txt.ame
+// Tests: txt with semantic color
+root = col([t1, t2, t3])
+t1 = txt("Primary text", body, color=primary)
+t2 = txt("Error text", body, color=error)
+t3 = txt("Success text", body, color=success)

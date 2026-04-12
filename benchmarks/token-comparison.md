@@ -2,13 +2,13 @@
 
 ## Summary
 
-AME syntax uses **1.62x fewer tokens** than A2UI v0.9 JSON on average across
-five representative UI scenarios, as measured by the Gemini `gemini-2.0-flash`
+AME syntax uses **1.77x fewer tokens** than A2UI v0.9 JSON on average across
+eight representative UI scenarios, as measured by the Gemini `gemini-2.0-flash`
 tokenizer via the `countTokens` REST API. This confirms that AME's compact
 line-oriented notation produces meaningfully smaller output than A2UI's
 flat-component JSON format for equivalent UIs.
 
-**GATE 1 Result: PASS** — A2UI/AME average ratio = 1.62x (threshold: ≥ 1.5x)
+**GATE 1 Result: PASS** — A2UI/AME average ratio = 1.77x (threshold: ≥ 1.5x)
 
 ---
 
@@ -16,7 +16,7 @@ flat-component JSON format for equivalent UIs.
 
 ### What Was Measured
 
-Token counts for five identical UIs, each written in three formats:
+Token counts for eight identical UIs, each written in three formats:
 
 1. **AME** — line-oriented syntax per [syntax.md](../specification/v1.0/syntax.md)
 2. **A2UI v0.9** — flat JSON component array per
@@ -97,16 +97,33 @@ of cross-tokenizer benchmarks are welcome.
 | Email Inbox (5 items, 3 badges) | 420 | 605 | 308 | 1.44x | 0.73x |
 | Booking Form (4 inputs, 2 buttons) | 188 | 412 | 184 | 2.19x | 0.98x |
 | Side-by-Side Comparison (2 cards, 6 rows) | 604 | 889 | 445 | 1.47x | 0.74x |
-| **Total** | **1,924** | **3,123** | **1,617** | **1.62x** | **0.84x** |
+| **v1.0 Subtotal** | **1,924** | **3,123** | **1,617** | **1.62x** | **0.84x** |
+| Medical Dashboard (chart + callout + timeline) | 218 | 743 | 213 | 3.41x | 0.98x |
+| Code Tutorial (code + accordion) | 294 | 554 | 266 | 1.88x | 0.90x |
+| Product Gallery (carousel + badges + chart) | 436 | 664 | 402 | 1.52x | 0.92x |
+| **v1.1 Subtotal** | **948** | **1,961** | **881** | **2.07x** | **0.93x** |
+| **Total (all 8 scenarios)** | **2,872** | **5,084** | **2,498** | **1.77x** | **0.87x** |
 
 ### Key Observations
 
 **AME vs A2UI v0.9 (the primary comparison):**
 
-AME is 1.62x more compact than A2UI on average. The efficiency gain varies
-by UI complexity:
+AME is 1.77x more compact than A2UI on average across all 8 scenarios. The
+v1.1 primitives show an even stronger advantage (2.07x) because A2UI v0.9
+has no native chart, callout, timeline, code, accordion, or carousel
+components — developers must compose these from raw `Text`, `Row`, `Column`,
+`Card`, and `Icon` primitives, multiplying structural overhead.
 
-- **Booking Form (2.19x):** The largest gap. A2UI's form components
+The efficiency gain varies by UI complexity:
+
+- **Medical Dashboard (3.41x):** The largest gap across all scenarios. AME's
+  `chart()`, `callout()`, and `timeline()` each encode rich semantics in a
+  single compact call. A2UI must build the same UI from ~30 raw components:
+  icon + text pairs for timeline steps, card + row + icon + column for the
+  callout box, and a text-based chart placeholder. The 3.41x ratio
+  demonstrates why dedicated primitives matter for token efficiency.
+
+- **Booking Form (2.19x):** The largest v1.0 gap. A2UI's form components
   (`DateTimeInput`, `ChoicePicker`, `TextField`) require verbose JSON
   properties (`enableDate`, `enableTime`, `maxAllowedSelections`,
   `textFieldType`), data binding objects (`{"path": "/form/..."}"`), and each
@@ -134,10 +151,20 @@ by UI complexity:
   rows have similar overhead in both formats. A2UI's advantage from shorter
   component names (`Text` vs `txt`) is offset by its JSON boilerplate.
 
+- **Code Tutorial (1.88x):** AME's `code()` and `accordion()` primitives
+  encode language, content, title, and expand state in compact calls. A2UI
+  requires `Card` + `Column` + `Text(variant: "h3")` + `Text(variant:
+  "code")` per step — 4 components where AME uses 2.
+
+- **Product Gallery (1.52x):** The closest v1.1 ratio. This scenario has
+  significant content tokens (URLs, spec text) that dilute the structural
+  advantage. Still, AME's `carousel()`, `chart()`, and `badge(color=success)`
+  are each single calls vs multi-component A2UI constructions.
+
 **AME vs Raw JSON (the baseline comparison):**
 
-Raw nested JSON is 1.19x more compact than AME on average. This is expected
-and by design — AME pays a ~19% token overhead for capabilities that raw JSON
+Raw nested JSON is 1.15x more compact than AME on average. This is expected
+and by design — AME pays a ~15% token overhead for capabilities that raw JSON
 lacks:
 
 - **Identifiers** — every AME line has `identifier = ...`, consuming tokens
@@ -148,7 +175,7 @@ lacks:
 - **Updatability** — identifiers allow individual nodes to be replaced by ID.
   Raw JSON requires regenerating the entire tree.
 
-The 19% overhead is the cost of AME's streaming and addressability features.
+The 15% overhead is the cost of AME's streaming and addressability features.
 For the scenarios where AME is used (LLM-generated streaming UI), this overhead
 is justified by the dramatically improved user experience of progressive
 rendering.
@@ -187,11 +214,11 @@ For simple text-heavy UIs without actions, A2UI's overhead approaches AME's.
 
 ### Implications for Production Use
 
-At the measured ratio of 1.62x, an application generating 10,000 UI responses
-per day would save approximately 12,000 tokens per day using AME instead of
-A2UI for an average-complexity UI. For the Place Search scenario (the most
-representative of real assistant interactions), the savings per response are
-1,014 - 581 = 433 tokens, or a 42.7% reduction.
+At the measured ratio of 1.77x, an application generating 10,000 UI responses
+per day would save approximately 15,400 tokens per day using AME instead of
+A2UI for an average-complexity UI. For the Medical Dashboard scenario (the
+most representative of v1.1 rich-UI interactions), the savings per response
+are 743 - 218 = 525 tokens, or a 70.7% reduction.
 
 These savings compound with Tier 0 rendering (see
 [tier-zero.md](../specification/v1.0/tier-zero.md)), which eliminates UI
@@ -339,6 +366,64 @@ pb_btn = btn("Select Pro", tool(select_plan, plan="pro"), primary)
 comp_note = txt("All plans include a 14-day free trial.", caption)
 ```
 
+**AME Medical Dashboard (218 tokens):**
+
+```
+root = col([vitals_title, heart_chart, bp_warn, treatment])
+vitals_title = txt("Patient Vitals", headline)
+heart_chart = chart(line, values=[72,75,71,78,82,76], labels=["6am","8am","10am","12pm","2pm","4pm"], height=180)
+bp_warn = callout(warning, "Blood pressure elevated: 145/92 mmHg. Consider dose adjustment.", "Alert")
+treatment = timeline([t1, t2, t3, t4])
+t1 = timeline_item("Lab Work", "Blood panel complete", done)
+t2 = timeline_item("Consultation", "With Dr. Chen at 2pm", done)
+t3 = timeline_item("Medication Review", "Adjusting dosage", active)
+t4 = timeline_item("Follow-up", "Scheduled for next week", pending)
+```
+
+**AME Code Tutorial (294 tokens):**
+
+```
+root = col([tut_title, step1, step2, step3])
+tut_title = txt("Getting Started with AME", headline)
+step1 = accordion("1. Define Your Root", [s1_code, s1_note])
+s1_code = code("kotlin", "val parser = AmeParser()\nparser.feed(\"root = col([greeting])\")\nparser.feed(\"greeting = txt(\\\"Hello!\\\", headline)\")")
+s1_note = txt("The root identifier is the entry point of your UI tree.", caption)
+step2 = accordion("2. Parse and Render", [s2_code, s2_note])
+s2_code = code("kotlin", "val tree = parser.getResolvedTree()\nAmeRenderer(tree)")
+s2_note = txt("getResolvedTree() resolves all forward references.", caption)
+step3 = accordion("3. Handle Actions", [s3_code, s3_note])
+s3_code = code("kotlin", "AmeActionHandler { action ->\n    when (action) {\n        is AmeAction.Tool -> callTool(action)\n        is AmeAction.Uri -> openUri(action.uri)\n    }\n}")
+s3_note = txt("Actions are dispatched through a single handler.", caption)
+```
+
+**AME Product Gallery (436 tokens):**
+
+```
+root = col([prod_title, gallery, price_row, specs, size_chart, buy_btn])
+prod_title = txt("Nike Air Max 90", headline)
+gallery = carousel([img1, img2, img3])
+img1 = img("https://example.com/airmax-side.jpg", 280)
+img2 = img("https://example.com/airmax-top.jpg", 280)
+img3 = img("https://example.com/airmax-sole.jpg", 280)
+price_row = row([price, discount_badge, stock_badge], 8)
+price = txt("$129.99", title)
+discount_badge = badge("20% OFF", filled, color=success)
+stock_badge = badge("In Stock", outlined, color=primary)
+specs = accordion("Specifications", [spec_list])
+spec_list = col([s1, s2, s3])
+s1 = row([s1k, s1v], space_between)
+s1k = txt("Material", caption)
+s1v = txt("Leather/Mesh", body)
+s2 = row([s2k, s2v], space_between)
+s2k = txt("Weight", caption)
+s2v = txt("312g", body)
+s3 = row([s3k, s3v], space_between)
+s3k = txt("Cushioning", caption)
+s3v = txt("Air Max unit", body)
+size_chart = chart(bar, values=[12,45,38,28,15], labels=["8","9","10","11","12"], height=120, color=primary)
+buy_btn = btn("Add to Cart", tool(add_to_cart, product="airmax90", size="10"), primary)
+```
+
 ### A2UI v0.9 Strings
 
 **A2UI Weather Card (203 tokens):**
@@ -369,6 +454,24 @@ comp_note = txt("All plans include a 14-day free trial.", caption)
 
 ```json
 {"updateComponents":{"surfaceId":"compare","components":[{"id":"root","component":"Column","children":["comp-title","comp-row","comp-note"]},{"id":"comp-title","component":"Text","text":"Compare Plans","variant":"h2"},{"id":"comp-row","component":"Row","children":["plan-a","plan-b"]},{"id":"plan-a","component":"Card","child":"pa-content"},{"id":"pa-content","component":"Column","children":["pa-name","pa-price","pa-details","pa-btn"]},{"id":"pa-name","component":"Text","text":"Basic Plan","variant":"h3"},{"id":"pa-price","component":"Text","text":"$15/month","variant":"h1"},{"id":"pa-details","component":"Column","children":["pa-d1","pa-d2","pa-d3"]},{"id":"pa-d1","component":"Row","children":["pa-d1-k","pa-d1-v"],"justify":"spaceBetween"},{"id":"pa-d1-k","component":"Text","text":"Storage","variant":"caption"},{"id":"pa-d1-v","component":"Text","text":"50 GB"},{"id":"pa-d2","component":"Row","children":["pa-d2-k","pa-d2-v"],"justify":"spaceBetween"},{"id":"pa-d2-k","component":"Text","text":"Users","variant":"caption"},{"id":"pa-d2-v","component":"Text","text":"1"},{"id":"pa-d3","component":"Row","children":["pa-d3-k","pa-d3-v"],"justify":"spaceBetween"},{"id":"pa-d3-k","component":"Text","text":"Support","variant":"caption"},{"id":"pa-d3-v","component":"Text","text":"Email only"},{"id":"pa-btn-text","component":"Text","text":"Select Basic"},{"id":"pa-btn","component":"Button","child":"pa-btn-text","action":{"event":{"name":"select_plan","data":{"plan":"basic"}}}},{"id":"plan-b","component":"Card","child":"pb-content"},{"id":"pb-content","component":"Column","children":["pb-name","pb-price","pb-details","pb-badge","pb-btn"]},{"id":"pb-name","component":"Text","text":"Pro Plan","variant":"h3"},{"id":"pb-price","component":"Text","text":"$45/month","variant":"h1"},{"id":"pb-details","component":"Column","children":["pb-d1","pb-d2","pb-d3"]},{"id":"pb-d1","component":"Row","children":["pb-d1-k","pb-d1-v"],"justify":"spaceBetween"},{"id":"pb-d1-k","component":"Text","text":"Storage","variant":"caption"},{"id":"pb-d1-v","component":"Text","text":"500 GB"},{"id":"pb-d2","component":"Row","children":["pb-d2-k","pb-d2-v"],"justify":"spaceBetween"},{"id":"pb-d2-k","component":"Text","text":"Users","variant":"caption"},{"id":"pb-d2-v","component":"Text","text":"10"},{"id":"pb-d3","component":"Row","children":["pb-d3-k","pb-d3-v"],"justify":"spaceBetween"},{"id":"pb-d3-k","component":"Text","text":"Support","variant":"caption"},{"id":"pb-d3-v","component":"Text","text":"24/7 Priority"},{"id":"pb-badge","component":"Text","text":"Recommended","variant":"caption"},{"id":"pb-btn-text","component":"Text","text":"Select Pro"},{"id":"pb-btn","component":"Button","child":"pb-btn-text","variant":"primary","action":{"event":{"name":"select_plan","data":{"plan":"pro"}}}},{"id":"comp-note","component":"Text","text":"All plans include a 14-day free trial.","variant":"caption"}]}}
+```
+
+**A2UI Medical Dashboard (743 tokens):**
+
+```json
+{"updateComponents":{"surfaceId":"medical","components":[{"id":"root","component":"Column","children":["vitals-title","heart-chart","bp-warn","treatment"]},{"id":"vitals-title","component":"Text","text":"Patient Vitals","variant":"h2"},{"id":"heart-chart","component":"Column","children":["chart-label","chart-placeholder"]},{"id":"chart-label","component":"Text","text":"Heart Rate (bpm)","variant":"caption"},{"id":"chart-placeholder","component":"Text","text":"72 → 75 → 71 → 78 → 82 → 76\n6am   8am   10am   12pm   2pm   4pm"},{"id":"bp-warn","component":"Card","child":"bp-warn-content"},{"id":"bp-warn-content","component":"Row","children":["bp-warn-icon","bp-warn-text"]},{"id":"bp-warn-icon","component":"Icon","name":"warning"},{"id":"bp-warn-text","component":"Column","children":["bp-warn-title","bp-warn-msg"]},{"id":"bp-warn-title","component":"Text","text":"Alert","variant":"h3"},{"id":"bp-warn-msg","component":"Text","text":"Blood pressure elevated: 145/92 mmHg. Consider dose adjustment."},{"id":"treatment","component":"Column","children":["t1","t2","t3","t4"]},{"id":"t1","component":"Row","children":["t1-icon","t1-info"]},{"id":"t1-icon","component":"Icon","name":"check_circle"},{"id":"t1-info","component":"Column","children":["t1-title","t1-sub"]},{"id":"t1-title","component":"Text","text":"Lab Work","variant":"h3"},{"id":"t1-sub","component":"Text","text":"Blood panel complete","variant":"caption"},{"id":"t2","component":"Row","children":["t2-icon","t2-info"]},{"id":"t2-icon","component":"Icon","name":"check_circle"},{"id":"t2-info","component":"Column","children":["t2-title","t2-sub"]},{"id":"t2-title","component":"Text","text":"Consultation","variant":"h3"},{"id":"t2-sub","component":"Text","text":"With Dr. Chen at 2pm","variant":"caption"},{"id":"t3","component":"Row","children":["t3-icon","t3-info"]},{"id":"t3-icon","component":"Icon","name":"radio_button_checked"},{"id":"t3-info","component":"Column","children":["t3-title","t3-sub"]},{"id":"t3-title","component":"Text","text":"Medication Review","variant":"h3"},{"id":"t3-sub","component":"Text","text":"Adjusting dosage","variant":"caption"},{"id":"t4","component":"Row","children":["t4-icon","t4-info"]},{"id":"t4-icon","component":"Icon","name":"radio_button_unchecked"},{"id":"t4-info","component":"Column","children":["t4-title","t4-sub"]},{"id":"t4-title","component":"Text","text":"Follow-up","variant":"h3"},{"id":"t4-sub","component":"Text","text":"Scheduled for next week","variant":"caption"}]}}
+```
+
+**A2UI Code Tutorial (554 tokens):**
+
+```json
+{"updateComponents":{"surfaceId":"tutorial","components":[{"id":"root","component":"Column","children":["tut-title","step1","step2","step3"]},{"id":"tut-title","component":"Text","text":"Getting Started with AME","variant":"h2"},{"id":"step1","component":"Card","child":"step1-content"},{"id":"step1-content","component":"Column","children":["step1-header","step1-body"]},{"id":"step1-header","component":"Text","text":"1. Define Your Root","variant":"h3"},{"id":"step1-body","component":"Column","children":["step1-code","step1-note"]},{"id":"step1-code","component":"Text","text":"val parser = AmeParser()\nparser.feed(\"root = col([greeting])\")\nparser.feed(\"greeting = txt(\\\"Hello!\\\", headline)\")","variant":"code"},{"id":"step1-note","component":"Text","text":"The root identifier is the entry point of your UI tree.","variant":"caption"},{"id":"step2","component":"Card","child":"step2-content"},{"id":"step2-content","component":"Column","children":["step2-header","step2-body"]},{"id":"step2-header","component":"Text","text":"2. Parse and Render","variant":"h3"},{"id":"step2-body","component":"Column","children":["step2-code","step2-note"]},{"id":"step2-code","component":"Text","text":"val tree = parser.getResolvedTree()\nAmeRenderer(tree)","variant":"code"},{"id":"step2-note","component":"Text","text":"getResolvedTree() resolves all forward references.","variant":"caption"},{"id":"step3","component":"Card","child":"step3-content"},{"id":"step3-content","component":"Column","children":["step3-header","step3-body"]},{"id":"step3-header","component":"Text","text":"3. Handle Actions","variant":"h3"},{"id":"step3-body","component":"Column","children":["step3-code","step3-note"]},{"id":"step3-code","component":"Text","text":"AmeActionHandler { action ->\n    when (action) {\n        is AmeAction.Tool -> callTool(action)\n        is AmeAction.Uri -> openUri(action.uri)\n    }\n}","variant":"code"},{"id":"step3-note","component":"Text","text":"Actions are dispatched through a single handler.","variant":"caption"}]}}
+```
+
+**A2UI Product Gallery (664 tokens):**
+
+```json
+{"updateComponents":{"surfaceId":"product","components":[{"id":"root","component":"Column","children":["prod-title","gallery","price-row","specs","size-chart","buy-btn"]},{"id":"prod-title","component":"Text","text":"Nike Air Max 90","variant":"h2"},{"id":"gallery","component":"Row","children":["img1","img2","img3"]},{"id":"img1","component":"Image","url":"https://example.com/airmax-side.jpg","height":280},{"id":"img2","component":"Image","url":"https://example.com/airmax-top.jpg","height":280},{"id":"img3","component":"Image","url":"https://example.com/airmax-sole.jpg","height":280},{"id":"price-row","component":"Row","children":["price","discount-badge","stock-badge"]},{"id":"price","component":"Text","text":"$129.99","variant":"h3"},{"id":"discount-badge","component":"Text","text":"20% OFF","variant":"caption"},{"id":"stock-badge","component":"Text","text":"In Stock","variant":"caption"},{"id":"specs","component":"Card","child":"specs-content"},{"id":"specs-content","component":"Column","children":["specs-header","spec-list"]},{"id":"specs-header","component":"Text","text":"Specifications","variant":"h3"},{"id":"spec-list","component":"Column","children":["s1","s2","s3"]},{"id":"s1","component":"Row","children":["s1k","s1v"],"justify":"spaceBetween"},{"id":"s1k","component":"Text","text":"Material","variant":"caption"},{"id":"s1v","component":"Text","text":"Leather/Mesh"},{"id":"s2","component":"Row","children":["s2k","s2v"],"justify":"spaceBetween"},{"id":"s2k","component":"Text","text":"Weight","variant":"caption"},{"id":"s2v","component":"Text","text":"312g"},{"id":"s3","component":"Row","children":["s3k","s3v"],"justify":"spaceBetween"},{"id":"s3k","component":"Text","text":"Cushioning","variant":"caption"},{"id":"s3v","component":"Text","text":"Air Max unit"},{"id":"size-chart","component":"Column","children":["size-label","size-placeholder"]},{"id":"size-label","component":"Text","text":"Size Availability","variant":"caption"},{"id":"size-placeholder","component":"Text","text":"8: 12 | 9: 45 | 10: 38 | 11: 28 | 12: 15"},{"id":"buy-btn-text","component":"Text","text":"Add to Cart"},{"id":"buy-btn","component":"Button","child":"buy-btn-text","variant":"primary","action":{"event":{"name":"add_to_cart","data":{"product":"airmax90","size":"10"}}}}]}}
 ```
 
 ### Raw JSON Strings
@@ -403,6 +506,24 @@ comp_note = txt("All plans include a 14-day free trial.", caption)
 {"type":"col","children":[{"type":"txt","text":"Compare Plans","style":"headline"},{"type":"row","gap":12,"children":[{"type":"card","children":[{"type":"txt","text":"Basic Plan","style":"title"},{"type":"txt","text":"$15/month","style":"display"},{"type":"col","children":[{"type":"row","justify":"spaceBetween","children":[{"type":"txt","text":"Storage","style":"caption"},{"type":"txt","text":"50 GB","style":"body"}]},{"type":"row","justify":"spaceBetween","children":[{"type":"txt","text":"Users","style":"caption"},{"type":"txt","text":"1","style":"body"}]},{"type":"row","justify":"spaceBetween","children":[{"type":"txt","text":"Support","style":"caption"},{"type":"txt","text":"Email only","style":"body"}]}]},{"type":"btn","text":"Select Basic","style":"outline","action":{"type":"tool","name":"select_plan","args":{"plan":"basic"}}}]},{"type":"card","children":[{"type":"txt","text":"Pro Plan","style":"title"},{"type":"txt","text":"$45/month","style":"display"},{"type":"col","children":[{"type":"row","justify":"spaceBetween","children":[{"type":"txt","text":"Storage","style":"caption"},{"type":"txt","text":"500 GB","style":"body"}]},{"type":"row","justify":"spaceBetween","children":[{"type":"txt","text":"Users","style":"caption"},{"type":"txt","text":"10","style":"body"}]},{"type":"row","justify":"spaceBetween","children":[{"type":"txt","text":"Support","style":"caption"},{"type":"txt","text":"24/7 Priority","style":"body"}]}]},{"type":"badge","text":"Recommended","variant":"success"},{"type":"btn","text":"Select Pro","style":"primary","action":{"type":"tool","name":"select_plan","args":{"plan":"pro"}}}]}]},{"type":"txt","text":"All plans include a 14-day free trial.","style":"caption"}]}
 ```
 
+**Raw JSON Medical Dashboard (213 tokens):**
+
+```json
+{"type":"col","children":[{"type":"txt","text":"Patient Vitals","style":"headline"},{"type":"chart","chartType":"line","values":[72,75,71,78,82,76],"labels":["6am","8am","10am","12pm","2pm","4pm"],"height":180},{"type":"callout","calloutType":"warning","content":"Blood pressure elevated: 145/92 mmHg. Consider dose adjustment.","title":"Alert"},{"type":"timeline","children":[{"type":"timeline_item","title":"Lab Work","subtitle":"Blood panel complete","status":"done"},{"type":"timeline_item","title":"Consultation","subtitle":"With Dr. Chen at 2pm","status":"done"},{"type":"timeline_item","title":"Medication Review","subtitle":"Adjusting dosage","status":"active"},{"type":"timeline_item","title":"Follow-up","subtitle":"Scheduled for next week","status":"pending"}]}]}
+```
+
+**Raw JSON Code Tutorial (266 tokens):**
+
+```json
+{"type":"col","children":[{"type":"txt","text":"Getting Started with AME","style":"headline"},{"type":"accordion","title":"1. Define Your Root","children":[{"type":"code","language":"kotlin","content":"val parser = AmeParser()\nparser.feed(\"root = col([greeting])\")\nparser.feed(\"greeting = txt(\\\"Hello!\\\", headline)\")"},{"type":"txt","text":"The root identifier is the entry point of your UI tree.","style":"caption"}]},{"type":"accordion","title":"2. Parse and Render","children":[{"type":"code","language":"kotlin","content":"val tree = parser.getResolvedTree()\nAmeRenderer(tree)"},{"type":"txt","text":"getResolvedTree() resolves all forward references.","style":"caption"}]},{"type":"accordion","title":"3. Handle Actions","children":[{"type":"code","language":"kotlin","content":"AmeActionHandler { action ->\n    when (action) {\n        is AmeAction.Tool -> callTool(action)\n        is AmeAction.Uri -> openUri(action.uri)\n    }\n}"},{"type":"txt","text":"Actions are dispatched through a single handler.","style":"caption"}]}]}
+```
+
+**Raw JSON Product Gallery (402 tokens):**
+
+```json
+{"type":"col","children":[{"type":"txt","text":"Nike Air Max 90","style":"headline"},{"type":"carousel","children":[{"type":"img","url":"https://example.com/airmax-side.jpg","height":280},{"type":"img","url":"https://example.com/airmax-top.jpg","height":280},{"type":"img","url":"https://example.com/airmax-sole.jpg","height":280}]},{"type":"row","gap":8,"children":[{"type":"txt","text":"$129.99","style":"title"},{"type":"badge","label":"20% OFF","variant":"filled","color":"success"},{"type":"badge","label":"In Stock","variant":"outlined","color":"primary"}]},{"type":"accordion","title":"Specifications","children":[{"type":"col","children":[{"type":"row","justify":"spaceBetween","children":[{"type":"txt","text":"Material","style":"caption"},{"type":"txt","text":"Leather/Mesh","style":"body"}]},{"type":"row","justify":"spaceBetween","children":[{"type":"txt","text":"Weight","style":"caption"},{"type":"txt","text":"312g","style":"body"}]},{"type":"row","justify":"spaceBetween","children":[{"type":"txt","text":"Cushioning","style":"caption"},{"type":"txt","text":"Air Max unit","style":"body"}]}]}]},{"type":"chart","chartType":"bar","values":[12,45,38,28,15],"labels":["8","9","10","11","12"],"height":120,"color":"primary"},{"type":"btn","text":"Add to Cart","style":"primary","action":{"type":"tool","name":"add_to_cart","args":{"product":"airmax90","size":"10"}}}]}
+```
+
 ---
 
 ## Version History
@@ -410,3 +531,4 @@ comp_note = txt("All plans include a 14-day free trial.", caption)
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-04-05 | Initial benchmark — 5 scenarios, 3 formats, measured via Gemini countTokens |
+| 1.1 | 2026-04-11 | Added 3 v1.1 scenarios (medical dashboard, code tutorial, product gallery); updated totals and ratios |

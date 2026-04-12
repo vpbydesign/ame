@@ -1,0 +1,11 @@
+// conformance/48-v11-mixed-layout.ame
+// Tests: mixed v1.0 and v1.1 primitives in full layout
+root = col([title, status_row, the_chart, warn, details])
+title = txt("Dashboard", headline)
+status_row = row([b1, b2])
+b1 = badge("Live", filled, color=success)
+b2 = badge("v1.1", outlined)
+the_chart = chart(line, values=[2.1,4.3,3.7,6.5], labels=["W1","W2","W3","W4"])
+warn = callout(warning, "Server load is high.")
+details = accordion("Details", [d1])
+d1 = txt("CPU usage peaked at 92%.", body)

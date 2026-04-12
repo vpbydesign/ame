@@ -1,0 +1,5 @@
+// conformance/55-error-recovery-v11.ame
+// Tests: error recovery for unknown v1.1 component
+root = col([good, bad])
+good = callout(info, "This is valid.")
+bad = widget("unknown")

@@ -1,6 +1,6 @@
-# AME Specification — Version 1.0
+# AME Specification — Version 1.1
 
-The AME v1.0 specification defines a compact, streaming-first syntax for
+The AME v1.1 specification defines a compact, streaming-first syntax for
 describing interactive user interfaces, designed for LLM generation and
 native mobile rendering.
 
@@ -9,7 +9,7 @@ native mobile rendering.
 | Document | Description |
 |----------|-------------|
 | [syntax.md](syntax.md) | Line-oriented syntax rules and EBNF grammar |
-| [primitives.md](primitives.md) | 15 standard UI primitives with argument tables |
+| [primitives.md](primitives.md) | 21 standard UI primitives with argument tables |
 | [actions.md](actions.md) | 5 action types (tool, uri, nav, copy, submit) |
 | [streaming.md](streaming.md) | Progressive rendering with forward references |
 | [data-binding.md](data-binding.md) | $path references, --- separator, each() templates |
@@ -25,7 +25,7 @@ SHOULD state which level they conform to.
 
 An implementation claims AME Core Conformance when:
 
-1. **Parser** handles all 15 standard primitives defined in
+1. **Parser** handles all 21 standard primitives defined in
    [primitives.md](primitives.md), plus `each()` from
    [data-binding.md](data-binding.md), plus `Ref` for forward references.
 2. **Parser** handles the `---` data separator and resolves `$path`
@@ -34,11 +34,11 @@ An implementation claims AME Core Conformance when:
    [syntax.md](syntax.md) (unknown component, unclosed parenthesis,
    unclosed string, malformed line, duplicate identifier, invalid number,
    invalid enum value). The parser MUST NOT crash on any input.
-4. **Renderer** displays all 15 standard primitives as native platform
+4. **Renderer** displays all 21 standard primitives as native platform
    widgets.
 5. **Renderer** dispatches all actions through the `AmeActionHandler`
    interface (or platform equivalent).
-6. All 5 example `.ame` files in the `examples/` directory parse and
+6. All 9 example `.ame` files in the `examples/` directory parse and
    render without errors.
 
 ### AME Streaming Conformance
@@ -61,4 +61,5 @@ batch parsing (entire document at once) claim Core Conformance only.
 
 | Version | Date | Status |
 |---------|------|--------|
-| 1.0 | 2026-04-05 | Current |
+| 1.0 | 2026-04-05 | Superseded by v1.1 |
+| 1.1 | 2026-04-11 | Current |

@@ -1,0 +1,9 @@
+// conformance/47-v11-in-col.ame
+// Tests: code, accordion, timeline in column layout
+root = col([snippet, faq, steps])
+snippet = code("bash", "echo Hello")
+faq = accordion("FAQ", [answer])
+answer = txt("AME is a compact syntax.", body)
+steps = timeline([s1, s2])
+s1 = timeline_item("Setup", "Install dependencies", done)
+s2 = timeline_item("Deploy", "Push to production", pending)

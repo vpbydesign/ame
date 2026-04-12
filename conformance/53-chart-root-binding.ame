@@ -1,0 +1,13 @@
+// conformance/53-chart-root-binding.ame
+// Tests: chart with $path values resolved from root data scope
+root = col([title, the_chart])
+title = txt("$report/title", headline)
+the_chart = chart(pie, values=$report/shares, labels=$report/segments)
+---
+{
+  "report": {
+    "title": "Market Share",
+    "shares": [45.2, 30.1, 24.7],
+    "segments": ["Product A", "Product B", "Product C"]
+  }
+}

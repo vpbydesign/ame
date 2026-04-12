@@ -2,7 +2,7 @@ import XCTest
 @testable import AMESwiftUI
 
 /// Parser tests covering:
-/// - All 15 primitives (happy path)
+/// - All 21 primitives (happy path)
 /// - All 5 action types in btn
 /// - Forward references
 /// - Data binding ($path, --- separator)
@@ -10,7 +10,7 @@ import XCTest
 /// - 3 complete examples from syntax.md
 /// - 6 error recovery cases
 ///
-/// Port of AmeParserTest.kt (1033 lines, 60 tests).
+/// Port of AmeParserTest.kt — v1.1 parity.
 final class AmeParserTests: XCTestCase {
 
     private func parse(_ input: String) -> AmeNode? {
@@ -41,7 +41,7 @@ final class AmeParserTests: XCTestCase {
         }
         XCTAssertEqual(children.count, 2)
         XCTAssertEqual(align, .start)
-        guard case .txt(let text, _, _) = children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let text, _, _, _) = children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(text, "Hello")
     }
 
@@ -102,7 +102,7 @@ final class AmeParserTests: XCTestCase {
         let result = parse(#"root = txt("Hello World", headline)"#)
 
         XCTAssertNotNil(result)
-        guard case .txt(let text, let style, _) = result else { XCTFail("Expected txt"); return }
+        guard case .txt(let text, let style, _, _) = result else { XCTFail("Expected txt"); return }
         XCTAssertEqual(text, "Hello World")
         XCTAssertEqual(style, .headline)
     }
@@ -111,7 +111,7 @@ final class AmeParserTests: XCTestCase {
         let result = parse(#"root = txt("Simple text")"#)
 
         XCTAssertNotNil(result)
-        guard case .txt(let text, let style, let maxLines) = result else { XCTFail("Expected txt"); return }
+        guard case .txt(let text, let style, let maxLines, _) = result else { XCTFail("Expected txt"); return }
         XCTAssertEqual(text, "Simple text")
         XCTAssertEqual(style, .body)
         XCTAssertNil(maxLines)
@@ -121,7 +121,7 @@ final class AmeParserTests: XCTestCase {
         let result = parse(#"root = txt("Long text", body, max_lines=3)"#)
 
         XCTAssertNotNil(result)
-        guard case .txt(_, _, let maxLines) = result else { XCTFail("Expected txt"); return }
+        guard case .txt(_, _, let maxLines, _) = result else { XCTFail("Expected txt"); return }
         XCTAssertEqual(maxLines, 3)
     }
 
@@ -129,7 +129,7 @@ final class AmeParserTests: XCTestCase {
         let result = parse(#"root = txt("She said \"hello\"")"#)
 
         XCTAssertNotNil(result)
-        guard case .txt(let text, _, _) = result else { XCTFail("Expected txt"); return }
+        guard case .txt(let text, _, _, _) = result else { XCTFail("Expected txt"); return }
         XCTAssertEqual(text, #"She said "hello""#)
     }
 
@@ -216,7 +216,7 @@ final class AmeParserTests: XCTestCase {
         let result = parse(#"root = badge("★4.5", info)"#)
 
         XCTAssertNotNil(result)
-        guard case .badge(let label, let variant) = result else { XCTFail("Expected badge"); return }
+        guard case .badge(let label, let variant, _) = result else { XCTFail("Expected badge"); return }
         XCTAssertEqual(label, "★4.5")
         XCTAssertEqual(variant, .info)
     }
@@ -225,7 +225,7 @@ final class AmeParserTests: XCTestCase {
         let result = parse(#"root = badge("Tag")"#)
 
         XCTAssertNotNil(result)
-        guard case .badge(_, let variant) = result else { XCTFail("Expected badge"); return }
+        guard case .badge(_, let variant, _) = result else { XCTFail("Expected badge"); return }
         XCTAssertEqual(variant, .default)
     }
 
@@ -420,13 +420,13 @@ final class AmeParserTests: XCTestCase {
         guard case .col(let children, _) = result else { XCTFail("Expected col"); return }
         XCTAssertEqual(children.count, 2)
 
-        guard case .txt(let headerText, _, _) = children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let headerText, _, _, _) = children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(headerText, "Title")
 
         guard case .card(let cardChildren, _) = children[1] else { XCTFail("Expected card"); return }
         XCTAssertEqual(cardChildren.count, 1)
 
-        guard case .txt(let contentText, _, _) = cardChildren[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let contentText, _, _, _) = cardChildren[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(contentText, "Details")
     }
 
@@ -446,7 +446,7 @@ final class AmeParserTests: XCTestCase {
         XCTAssertNotNil(tree)
 
         guard case .col(let resolvedChildren, _) = tree else { XCTFail("Expected col"); return }
-        guard case .txt(let resolvedText, _, _) = resolvedChildren[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let resolvedText, _, _, _) = resolvedChildren[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(resolvedText, "Title")
 
         if case .ref = resolvedChildren[1] {} else { XCTFail("body should still be a Ref") }
@@ -460,7 +460,7 @@ final class AmeParserTests: XCTestCase {
         let result = parse("root = txt($name, title)")
 
         XCTAssertNotNil(result)
-        guard case .txt(let text, let style, _) = result else { XCTFail("Expected txt"); return }
+        guard case .txt(let text, let style, _, _) = result else { XCTFail("Expected txt"); return }
         XCTAssertEqual(text, "$name")
         XCTAssertEqual(style, .title)
     }
@@ -469,7 +469,7 @@ final class AmeParserTests: XCTestCase {
         let result = parse("root = txt($address/city, caption)")
 
         XCTAssertNotNil(result)
-        guard case .txt(let text, _, _) = result else { XCTFail("Expected txt"); return }
+        guard case .txt(let text, _, _, _) = result else { XCTFail("Expected txt"); return }
         XCTAssertEqual(text, "$address/city")
     }
 
@@ -543,7 +543,7 @@ final class AmeParserTests: XCTestCase {
         XCTAssertEqual(headerAlign, .spaceBetween)
         XCTAssertEqual(headerChildren.count, 2)
 
-        guard case .txt(let cityText, let cityStyle, _) = headerChildren[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let cityText, let cityStyle, _, _) = headerChildren[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(cityText, "San Francisco")
         XCTAssertEqual(cityStyle, .title)
 
@@ -551,18 +551,18 @@ final class AmeParserTests: XCTestCase {
         XCTAssertEqual(iconName, "partly_cloudy_day")
         XCTAssertEqual(iconSize, 28)
 
-        guard case .txt(let tempText, let tempStyle, _) = children[1] else { XCTFail("Expected txt"); return }
+        guard case .txt(let tempText, let tempStyle, _, _) = children[1] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(tempText, "62°")
         XCTAssertEqual(tempStyle, .display)
 
-        guard case .txt(let condText, _, _) = children[2] else { XCTFail("Expected txt"); return }
+        guard case .txt(let condText, _, _, _) = children[2] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(condText, "Partly Cloudy")
 
         guard case .row(let detailChildren, let detailAlign, _) = children[3] else { XCTFail("Expected row"); return }
         XCTAssertEqual(detailChildren.count, 2)
         XCTAssertEqual(detailAlign, .spaceBetween)
 
-        guard case .txt(let hlText, let hlStyle, _) = detailChildren[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let hlText, let hlStyle, _, _) = detailChildren[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(hlText, "H:68°  L:55°")
         XCTAssertEqual(hlStyle, .caption)
     }
@@ -603,7 +603,7 @@ final class AmeParserTests: XCTestCase {
         guard case .col(let children, _) = result else { XCTFail("Expected col"); return }
         XCTAssertEqual(children.count, 2)
 
-        guard case .txt(let headerText, let headerStyle, _) = children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let headerText, let headerStyle, _, _) = children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(headerText, "Italian Restaurants Nearby")
         XCTAssertEqual(headerStyle, .headline)
 
@@ -617,10 +617,10 @@ final class AmeParserTests: XCTestCase {
         guard case .row(let p1TopChildren, let p1TopAlign, _) = p1Children[0] else { XCTFail("Expected row"); return }
         XCTAssertEqual(p1TopAlign, .spaceBetween)
 
-        guard case .txt(let p1Name, _, _) = p1TopChildren[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let p1Name, _, _, _) = p1TopChildren[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(p1Name, "Luigi's")
 
-        guard case .badge(let p1Rating, let p1Variant) = p1TopChildren[1] else { XCTFail("Expected badge"); return }
+        guard case .badge(let p1Rating, let p1Variant, _) = p1TopChildren[1] else { XCTFail("Expected badge"); return }
         XCTAssertEqual(p1Rating, "★4.5")
         XCTAssertEqual(p1Variant, .info)
 
@@ -637,7 +637,7 @@ final class AmeParserTests: XCTestCase {
         // Verify third card name
         guard case .card(let p3Children, _) = listChildren[2] else { XCTFail("Expected card"); return }
         guard case .row(let p3TopChildren, _, _) = p3Children[0] else { XCTFail("Expected row"); return }
-        guard case .txt(let p3Name, _, _) = p3TopChildren[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let p3Name, _, _, _) = p3TopChildren[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(p3Name, "Carbone")
     }
 
@@ -660,7 +660,7 @@ final class AmeParserTests: XCTestCase {
         guard case .card(let children, _) = result else { XCTFail("Expected card"); return }
         XCTAssertEqual(children.count, 3)
 
-        guard case .txt(let titleText, let titleStyle, _) = children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let titleText, let titleStyle, _, _) = children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(titleText, "Book a Table")
         XCTAssertEqual(titleStyle, .headline)
 
@@ -707,11 +707,11 @@ final class AmeParserTests: XCTestCase {
         guard case .row(let children, _, _) = result else { XCTFail("Expected row"); return }
         XCTAssertEqual(children.count, 2)
 
-        guard case .txt(let name, let nameStyle, _) = children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let name, let nameStyle, _, _) = children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(name, "Name")
         XCTAssertEqual(nameStyle, .title)
 
-        guard case .badge(let badgeLabel, _) = children[1] else { XCTFail("Expected badge"); return }
+        guard case .badge(let badgeLabel, _, _) = children[1] else { XCTFail("Expected badge"); return }
         XCTAssertEqual(badgeLabel, "★4.5")
     }
 
@@ -728,7 +728,7 @@ final class AmeParserTests: XCTestCase {
             """)
 
         XCTAssertNotNil(result)
-        guard case .txt(let text, _, _) = result else { XCTFail("Expected txt"); return }
+        guard case .txt(let text, _, _, _) = result else { XCTFail("Expected txt"); return }
         XCTAssertEqual(text, "Hello")
         XCTAssertFalse(parser.errors.isEmpty, "Should log error for malformed line")
     }
@@ -738,7 +738,7 @@ final class AmeParserTests: XCTestCase {
         let result = parser.parse(#"root = foobar("test")"#)
 
         XCTAssertNotNil(result)
-        guard case .txt(let text, _, _) = result else { XCTFail("Expected txt"); return }
+        guard case .txt(let text, _, _, _) = result else { XCTFail("Expected txt"); return }
         XCTAssertTrue(text.contains("Unknown"), "Unknown component should produce warning txt")
         XCTAssertTrue(parser.warnings.contains(where: { $0.contains("Unknown") }))
     }
@@ -748,7 +748,7 @@ final class AmeParserTests: XCTestCase {
         let result = parser.parse(#"root = txt("Hello", headline"#)
 
         XCTAssertNotNil(result)
-        guard case .txt(let text, _, _) = result else { XCTFail("Expected txt"); return }
+        guard case .txt(let text, _, _, _) = result else { XCTFail("Expected txt"); return }
         XCTAssertEqual(text, "Hello")
         XCTAssertTrue(parser.warnings.contains(where: { $0.contains("parenthesis") || $0.contains("Unclosed") }))
     }
@@ -772,7 +772,7 @@ final class AmeParserTests: XCTestCase {
         XCTAssertNotNil(result)
         guard case .col(let children, _) = result else { XCTFail("Expected col"); return }
 
-        guard case .txt(let text, _, _) = children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let text, _, _, _) = children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(text, "Second")
         XCTAssertTrue(parser.warnings.contains(where: { $0.contains("Duplicate") }))
     }
@@ -979,22 +979,22 @@ final class AmeParserTests: XCTestCase {
         guard case .col(let children, _) = result else { XCTFail("Expected col"); return }
         XCTAssertEqual(children.count, 2)
 
-        guard case .txt(let headerText, _, _) = children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let headerText, _, _, _) = children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(headerText, "Restaurants")
 
         guard case .col(let expanded, _) = children[1] else { XCTFail("Expected expanded col"); return }
         XCTAssertEqual(expanded.count, 3)
 
         guard case .card(let card0Children, _) = expanded[0] else { XCTFail("Expected card"); return }
-        guard case .txt(let txt0, _, _) = card0Children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let txt0, _, _, _) = card0Children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(txt0, "Pizza Palace")
 
         guard case .card(let card1Children, _) = expanded[1] else { XCTFail("Expected card"); return }
-        guard case .txt(let txt1, _, _) = card1Children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let txt1, _, _, _) = card1Children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(txt1, "Sushi Spot")
 
         guard case .card(let card2Children, _) = expanded[2] else { XCTFail("Expected card"); return }
-        guard case .txt(let txt2, _, _) = card2Children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let txt2, _, _, _) = card2Children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(txt2, "Taco Town")
     }
 
@@ -1050,7 +1050,7 @@ final class AmeParserTests: XCTestCase {
         guard case .col(let children, _) = result else { XCTFail("Expected col"); return }
         XCTAssertEqual(children.count, 2)
 
-        guard case .txt(let text, _, _) = children[1] else { XCTFail("Expected unwrapped txt"); return }
+        guard case .txt(let text, _, _, _) = children[1] else { XCTFail("Expected unwrapped txt"); return }
         XCTAssertEqual(text, "Only One")
     }
 
@@ -1068,15 +1068,15 @@ final class AmeParserTests: XCTestCase {
         XCTAssertEqual(expanded.count, 2)
 
         guard case .row(let row0Children, _, _) = expanded[0] else { XCTFail("Expected row"); return }
-        guard case .txt(let name0, _, _) = row0Children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let name0, _, _, _) = row0Children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(name0, "Alice")
-        guard case .txt(let phone0, _, _) = row0Children[1] else { XCTFail("Expected txt"); return }
+        guard case .txt(let phone0, _, _, _) = row0Children[1] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(phone0, "555-1234")
 
         guard case .row(let row1Children, _, _) = expanded[1] else { XCTFail("Expected row"); return }
-        guard case .txt(let name1, _, _) = row1Children[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let name1, _, _, _) = row1Children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(name1, "Bob")
-        guard case .txt(let phone1, _, _) = row1Children[1] else { XCTFail("Expected txt"); return }
+        guard case .txt(let phone1, _, _, _) = row1Children[1] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(phone1, "555-5678")
     }
 
@@ -1114,10 +1114,418 @@ final class AmeParserTests: XCTestCase {
         guard case .col(let expanded, _) = result else { XCTFail("Expected col"); return }
         XCTAssertEqual(expanded.count, 2)
 
-        guard case .txt(let txt0, _, _) = expanded[0] else { XCTFail("Expected txt"); return }
+        guard case .txt(let txt0, _, _, _) = expanded[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(txt0, "First")
 
-        guard case .txt(let txt1, _, _) = expanded[1] else { XCTFail("Expected txt"); return }
+        guard case .txt(let txt1, _, _, _) = expanded[1] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(txt1, "Second")
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // v1.1 Primitives — Parser Tests
+    // ════════════════════════════════════════════════════════════════════
+
+    // MARK: - Chart Tests
+
+    func testParseChartBar() {
+        let result = parse(#"root = chart(bar, values=[10, 20, 30])"#)
+        XCTAssertNotNil(result)
+        guard case .chart(let type, let values, _, _, let height, _, _, _, _) = result else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .bar)
+        XCTAssertEqual(values, [10, 20, 30])
+        XCTAssertEqual(height, 200)
+    }
+
+    func testParseChartLine() {
+        let result = parse(#"root = chart(line, values=[1.5, 2.5, 3.5], height=300)"#)
+        XCTAssertNotNil(result)
+        guard case .chart(let type, let values, _, _, let height, _, _, _, _) = result else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .line)
+        XCTAssertEqual(values, [1.5, 2.5, 3.5])
+        XCTAssertEqual(height, 300)
+    }
+
+    func testParseChartWithColor() {
+        let result = parse(#"root = chart(pie, values=[40, 60], color=success)"#)
+        XCTAssertNotNil(result)
+        guard case .chart(let type, _, _, _, _, let color, _, _, _) = result else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .pie)
+        XCTAssertEqual(color, .success)
+    }
+
+    func testParseChartWithLabels() {
+        let result = parse(#"root = chart(bar, values=[10, 20], labels=["A", "B"])"#)
+        XCTAssertNotNil(result)
+        guard case .chart(_, _, let labels, _, _, _, _, _, _) = result else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(labels, ["A", "B"])
+    }
+
+    func testParseChartDataBinding() {
+        let parser = AmeParser()
+        let result = parser.parse("""
+            root = chart(bar, values=$metrics)
+            ---
+            {"metrics": [5, 10, 15]}
+            """)
+        XCTAssertNotNil(result)
+        guard case .chart(_, let values, _, _, _, _, let valuesPath, _, _) = result else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(values, [5, 10, 15])
+        XCTAssertNil(valuesPath)
+    }
+
+    // MARK: - Code Tests
+
+    func testParseCode() {
+        let result = parse(#"root = code("swift", "print(\"hello\")")"#)
+        XCTAssertNotNil(result)
+        guard case .code(let language, let content, let title) = result else {
+            XCTFail("Expected code"); return
+        }
+        XCTAssertEqual(language, "swift")
+        XCTAssertEqual(content, #"print("hello")"#)
+        XCTAssertNil(title)
+    }
+
+    func testParseCodeWithTitle() {
+        let result = parse(#"root = code("kotlin", "val x = 1", "Example")"#)
+        XCTAssertNotNil(result)
+        guard case .code(_, _, let title) = result else {
+            XCTFail("Expected code"); return
+        }
+        XCTAssertEqual(title, "Example")
+    }
+
+    // MARK: - Accordion Tests
+
+    func testParseAccordion() {
+        let result = parse("""
+            root = accordion("Details", [content])
+            content = txt("Hidden text")
+            """)
+        XCTAssertNotNil(result)
+        guard case .accordion(let title, let children, let expanded) = result else {
+            XCTFail("Expected accordion"); return
+        }
+        XCTAssertEqual(title, "Details")
+        XCTAssertEqual(children.count, 1)
+        XCTAssertFalse(expanded)
+    }
+
+    func testParseAccordionExpanded() {
+        let result = parse("""
+            root = accordion("Open", [inner], true)
+            inner = txt("Visible")
+            """)
+        XCTAssertNotNil(result)
+        guard case .accordion(_, _, let expanded) = result else {
+            XCTFail("Expected accordion"); return
+        }
+        XCTAssertTrue(expanded)
+    }
+
+    // MARK: - Carousel Tests
+
+    func testParseCarousel() {
+        let result = parse("""
+            root = carousel([a, b])
+            a = txt("Slide 1")
+            b = txt("Slide 2")
+            """)
+        XCTAssertNotNil(result)
+        guard case .carousel(let children, let peek) = result else {
+            XCTFail("Expected carousel"); return
+        }
+        XCTAssertEqual(children.count, 2)
+        XCTAssertEqual(peek, 24)
+    }
+
+    func testParseCarouselWithPeek() {
+        let result = parse("""
+            root = carousel([a], peek=40)
+            a = txt("Slide")
+            """)
+        XCTAssertNotNil(result)
+        guard case .carousel(_, let peek) = result else {
+            XCTFail("Expected carousel"); return
+        }
+        XCTAssertEqual(peek, 40)
+    }
+
+    // MARK: - Callout Tests
+
+    func testParseCallout() {
+        let result = parse(#"root = callout(warning, "Careful!")"#)
+        XCTAssertNotNil(result)
+        guard case .callout(let type, let content, let title) = result else {
+            XCTFail("Expected callout"); return
+        }
+        XCTAssertEqual(type, .warning)
+        XCTAssertEqual(content, "Careful!")
+        XCTAssertNil(title)
+    }
+
+    func testParseCalloutWithTitle() {
+        let result = parse(#"root = callout(error, "Something failed", "Error")"#)
+        XCTAssertNotNil(result)
+        guard case .callout(let type, _, let title) = result else {
+            XCTFail("Expected callout"); return
+        }
+        XCTAssertEqual(type, .error)
+        XCTAssertEqual(title, "Error")
+    }
+
+    // MARK: - Timeline Tests
+
+    func testParseTimeline() {
+        let result = parse("""
+            root = timeline([s1, s2])
+            s1 = timeline_item("Step 1", "Done", done)
+            s2 = timeline_item("Step 2")
+            """)
+        XCTAssertNotNil(result)
+        guard case .timeline(let children) = result else {
+            XCTFail("Expected timeline"); return
+        }
+        XCTAssertEqual(children.count, 2)
+    }
+
+    func testParseTimelineItem() {
+        let result = parse(#"root = timeline_item("Deploy", "In progress", active)"#)
+        XCTAssertNotNil(result)
+        guard case .timelineItem(let title, let subtitle, let status) = result else {
+            XCTFail("Expected timeline_item"); return
+        }
+        XCTAssertEqual(title, "Deploy")
+        XCTAssertEqual(subtitle, "In progress")
+        XCTAssertEqual(status, .active)
+    }
+
+    func testParseTimelineItemDefaults() {
+        let result = parse(#"root = timeline_item("Pending step")"#)
+        XCTAssertNotNil(result)
+        guard case .timelineItem(let title, let subtitle, let status) = result else {
+            XCTFail("Expected timeline_item"); return
+        }
+        XCTAssertEqual(title, "Pending step")
+        XCTAssertNil(subtitle)
+        XCTAssertEqual(status, .pending)
+    }
+
+    // MARK: - SemanticColor on txt / badge
+
+    func testParseTxtWithColor() {
+        let result = parse(#"root = txt("Colored text", body, color=error)"#)
+        XCTAssertNotNil(result)
+        guard case .txt(let text, _, _, let color) = result else {
+            XCTFail("Expected txt"); return
+        }
+        XCTAssertEqual(text, "Colored text")
+        XCTAssertEqual(color, .error)
+    }
+
+    func testParseTxtColorDefaults() {
+        let result = parse(#"root = txt("Plain")"#)
+        XCTAssertNotNil(result)
+        guard case .txt(_, _, _, let color) = result else {
+            XCTFail("Expected txt"); return
+        }
+        XCTAssertNil(color)
+    }
+
+    func testParseBadgeWithColor() {
+        let result = parse(#"root = badge("Hot", default, color=warning)"#)
+        XCTAssertNotNil(result)
+        guard case .badge(let label, _, let color) = result else {
+            XCTFail("Expected badge"); return
+        }
+        XCTAssertEqual(label, "Hot")
+        XCTAssertEqual(color, .warning)
+    }
+
+    func testParseBadgeColorDefaults() {
+        let result = parse(#"root = badge("Tag")"#)
+        XCTAssertNotNil(result)
+        guard case .badge(_, _, let color) = result else {
+            XCTFail("Expected badge"); return
+        }
+        XCTAssertNil(color)
+    }
+
+    func testParseChartSparkline() {
+        let result = parse(#"root = chart(sparkline, values=[1, 2, 3, 4])"#)
+        XCTAssertNotNil(result)
+        guard case .chart(let type, let values, _, _, _, _, _, _, _) = result else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .sparkline)
+        XCTAssertEqual(values, [1, 2, 3, 4])
+    }
+
+    func testParseChartPie() {
+        let result = parse(#"root = chart(pie, values=[30, 50, 20])"#)
+        XCTAssertNotNil(result)
+        guard case .chart(let type, let values, _, _, _, _, _, _, _) = result else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .pie)
+        XCTAssertEqual(values, [30, 50, 20])
+    }
+
+    func testParseChartUnknownType() {
+        let result = parse(#"root = chart(donut, values=[1, 2])"#)
+        XCTAssertNotNil(result)
+        guard case .chart(let type, _, _, _, _, _, _, _, _) = result else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .bar)
+    }
+
+    func testParseChartEmptyValues() {
+        let result = parse(#"root = chart(bar)"#)
+        XCTAssertNotNil(result)
+        guard case .chart(let type, let values, _, _, _, _, _, _, _) = result else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .bar)
+        XCTAssertNil(values)
+    }
+
+    func testParseChartMultiSeries() {
+        let result = parse(#"root = chart(line, series=[[1,2,3],[4,5,6]], labels=["a","b","c"])"#)
+        XCTAssertNotNil(result)
+        guard case .chart(let type, _, let labels, let series, _, _, _, _, _) = result else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(type, .line)
+        XCTAssertNotNil(series)
+        XCTAssertEqual(series?.count, 2)
+        XCTAssertEqual(series?[0], [1, 2, 3])
+        XCTAssertEqual(series?[1], [4, 5, 6])
+        XCTAssertEqual(labels, ["a", "b", "c"])
+    }
+
+    func testParseCodeWithEscapes() {
+        let result = parse(#"root = code("kotlin", "line1\nline2\ttab\\end\"quote")"#)
+        XCTAssertNotNil(result)
+        guard case .code(_, let content, _) = result else {
+            XCTFail("Expected code"); return
+        }
+        XCTAssertEqual(content, "line1\nline2\ttab\\end\"quote")
+    }
+
+    func testParseAccordionDefaultCollapsed() {
+        let result = parse(#"root = accordion("FAQ", [txt("Answer")])"#)
+        XCTAssertNotNil(result)
+        guard case .accordion(_, _, let expanded) = result else {
+            XCTFail("Expected accordion"); return
+        }
+        XCTAssertFalse(expanded)
+    }
+
+    func testParseCarouselDefaultPeek() {
+        let result = parse(#"root = carousel([txt("A")])"#)
+        XCTAssertNotNil(result)
+        guard case .carousel(_, let peek) = result else {
+            XCTFail("Expected carousel"); return
+        }
+        XCTAssertEqual(peek, 24)
+    }
+
+    func testParseCalloutInfo() {
+        let result = parse(#"root = callout(info, "This is informational")"#)
+        XCTAssertNotNil(result)
+        guard case .callout(let type, let content, let title) = result else {
+            XCTFail("Expected callout"); return
+        }
+        XCTAssertEqual(type, .info)
+        XCTAssertEqual(content, "This is informational")
+        XCTAssertNil(title)
+    }
+
+    func testParseCalloutAllTypes() {
+        let cases: [(String, CalloutType)] = [
+            ("info", .info), ("warning", .warning), ("error", .error),
+            ("success", .success), ("tip", .tip)
+        ]
+        for (name, expected) in cases {
+            let result = parse("root = callout(\(name), \"msg\")")
+            XCTAssertNotNil(result, "callout(\(name)) returned nil")
+            guard case .callout(let type, _, _) = result else {
+                XCTFail("Expected callout for \(name)"); return
+            }
+            XCTAssertEqual(type, expected, "callout(\(name)) type mismatch")
+        }
+    }
+
+    func testParseCalloutUnknownType() {
+        let result = parse(#"root = callout(banana, "msg")"#)
+        XCTAssertNotNil(result)
+        guard case .callout(let type, _, _) = result else {
+            XCTFail("Expected callout"); return
+        }
+        XCTAssertEqual(type, .info)
+    }
+
+    // MARK: - WP#5b.1 Regression: Chart $path inside each()
+
+    func testChartInsideEachResolvesPerItemScope() {
+        let parser = AmeParser()
+        let result = parser.parse("""
+            root = col([results])
+            results = each($restaurants, tpl)
+            tpl = col([name, spending])
+            name = txt($name, title)
+            spending = chart(bar, values=$sales)
+            ---
+            {"restaurants":[{"name":"Luigi's","sales":[10,20,30]},{"name":"Bella's","sales":[40,50,60]}]}
+            """)
+
+        XCTAssertNotNil(result)
+        guard case .col(let rootChildren, _) = result else { XCTFail("Expected col"); return }
+
+        guard case .col(let expanded, _) = rootChildren[0] else { XCTFail("Expected expanded col"); return }
+        XCTAssertEqual(expanded.count, 2)
+
+        guard case .col(let tpl1Children, _) = expanded[0] else { XCTFail("Expected col tpl1"); return }
+        guard case .txt(let name1, _, _, _) = tpl1Children[0] else { XCTFail("Expected txt"); return }
+        XCTAssertEqual(name1, "Luigi's")
+        guard case .chart(_, let values1, _, _, _, _, let vp1, _, _) = tpl1Children[1] else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(values1, [10, 20, 30])
+        XCTAssertNil(vp1)
+
+        guard case .col(let tpl2Children, _) = expanded[1] else { XCTFail("Expected col tpl2"); return }
+        guard case .txt(let name2, _, _, _) = tpl2Children[0] else { XCTFail("Expected txt"); return }
+        XCTAssertEqual(name2, "Bella's")
+        guard case .chart(_, let values2, _, _, _, _, let vp2, _, _) = tpl2Children[1] else {
+            XCTFail("Expected chart"); return
+        }
+        XCTAssertEqual(values2, [40, 50, 60])
+        XCTAssertNil(vp2)
+    }
+
+    func testParseTimelineItemAllStatuses() {
+        let cases: [(String, TimelineStatus)] = [
+            ("done", .done), ("active", .active), ("pending", .pending), ("error", .error)
+        ]
+        for (name, expected) in cases {
+            let result = parse("root = timeline_item(\"t\", \"s\", \(name))")
+            XCTAssertNotNil(result, "timeline_item with status=\(name) returned nil")
+            guard case .timelineItem(_, _, let status) = result else {
+                XCTFail("Expected timeline_item for status=\(name)"); return
+            }
+            XCTAssertEqual(status, expected, "status=\(name) mismatch")
+        }
     }
 }

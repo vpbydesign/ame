@@ -1,0 +1,34 @@
+// v1.1-showcase.ame
+// Scenario: Demonstrates all v1.1 primitives — chart, code, accordion,
+// carousel, callout, timeline, and SemanticColor.
+//
+root = col([heading, revenue_chart, code_sample, faq, features, status_callout, project_timeline])
+
+heading = txt("AME v1.1 Showcase", headline, color=primary)
+
+// ── Chart ───────────────────────────────────────────────────────────
+revenue_chart = chart(bar, values=[12,25,18,30,22], labels=["Mon","Tue","Wed","Thu","Fri"], height=180)
+
+// ── Code ────────────────────────────────────────────────────────────
+code_sample = code("kotlin", "fun greet(name: String) = \"Hello, $name!\"", "Greeting.kt")
+
+// ── Accordion ───────────────────────────────────────────────────────
+faq = accordion("Frequently Asked Questions", [faq_q1, faq_q2])
+faq_q1 = txt("Q: What is AME?", body)
+faq_q2 = txt("A: A mobile UI rendering standard for AI agents.", body)
+
+// ── Carousel ────────────────────────────────────────────────────────
+features = carousel([feat_card1, feat_card2, feat_card3], peek=32)
+feat_card1 = card([txt("Token Efficient", title), txt("80% fewer tokens than HTML", caption)])
+feat_card2 = card([txt("Reliable Parsing", title), txt("Deterministic structured output", caption)])
+feat_card3 = card([txt("Native Rendering", title), txt("Compose, SwiftUI, Flutter", caption)])
+
+// ── Callout ─────────────────────────────────────────────────────────
+status_callout = callout(success, "All 21 primitives are now renderable.", "v1.1 Complete")
+
+// ── Timeline ────────────────────────────────────────────────────────
+project_timeline = timeline([step1, step2, step3, step4])
+step1 = timeline_item("Spec Frozen", "WP#4b complete", done)
+step2 = timeline_item("Core Data Model", "WP#5a complete", done)
+step3 = timeline_item("Compose Renderers", "WP#5b in progress", active)
+step4 = timeline_item("Swift Port", "WP#6 pending", pending)

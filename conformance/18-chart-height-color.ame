@@ -1,0 +1,3 @@
+// conformance/18-chart-height-color.ame
+// Tests: chart with custom height and semantic color
+root = chart(bar, values=[5.5,10.5,7.5], labels=["X","Y","Z"], height=300, color=success)
