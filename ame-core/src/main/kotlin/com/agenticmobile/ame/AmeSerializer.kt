@@ -38,13 +38,45 @@ object AmeSerializer {
         prettyPrint = true
     }
 
+    /**
+     * Diagnostic exception produced by [fromJsonOrError] / [actionFromJsonOrError]
+     * when JSON decoding fails. Wraps the underlying serialization or
+     * IO exception so hosts can distinguish invalid JSON, schema mismatch,
+     * and unexpected runtime failures without losing the original cause.
+     *
+     * Resolves Bug #15 by lifting the diagnostic out of the previous
+     * "swallow into null" path while keeping the legacy nullable APIs for
+     * backward compatibility.
+     */
+    class SerializationException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
     fun toJson(node: AmeNode): String =
         canonicalize(json.encodeToString(AmeNode.serializer(), node))
 
-    fun fromJson(jsonString: String): AmeNode? = try {
-        json.decodeFromString(AmeNode.serializer(), jsonString)
-    } catch (_: Exception) {
-        null
+    /**
+     * Decodes [jsonString] into an [AmeNode]. Returns `null` on any failure
+     * for backward compatibility. Hosts that need failure diagnostics
+     * should call [fromJsonOrError] instead.
+     */
+    fun fromJson(jsonString: String): AmeNode? = fromJsonOrError(jsonString).getOrNull()
+
+    /**
+     * Diagnostic-bearing counterpart to [fromJson]. Returns
+     * [Result.success] with the decoded [AmeNode] on success, or
+     * [Result.failure] wrapping a [SerializationException] that names
+     * the failure mode and carries the original cause.
+     *
+     * Resolves Bug #15: the previous nullable [fromJson] swallowed every
+     * failure into a single `null` return, so hosts could not distinguish
+     * invalid JSON, schema mismatch, missing root, or runtime errors. This
+     * API is additive; the legacy [fromJson] stays unchanged.
+     */
+    fun fromJsonOrError(jsonString: String): Result<AmeNode> = try {
+        Result.success(json.decodeFromString(AmeNode.serializer(), jsonString))
+    } catch (e: kotlinx.serialization.SerializationException) {
+        Result.failure(SerializationException("AME JSON decoding failed: ${e.message}", e))
+    } catch (e: Exception) {
+        Result.failure(SerializationException("Unexpected error during AME decoding: ${e.message}", e))
     }
 
     fun treeToJson(node: AmeNode, prettyPrint: Boolean = false): String {
@@ -55,10 +87,24 @@ object AmeSerializer {
     fun actionToJson(action: AmeAction): String =
         canonicalize(json.encodeToString(AmeAction.serializer(), action))
 
-    fun actionFromJson(jsonString: String): AmeAction? = try {
-        json.decodeFromString(AmeAction.serializer(), jsonString)
-    } catch (_: Exception) {
-        null
+    /**
+     * Decodes [jsonString] into an [AmeAction]. Returns `null` on any
+     * failure for backward compatibility. See [actionFromJsonOrError] for
+     * the diagnostic variant.
+     */
+    fun actionFromJson(jsonString: String): AmeAction? = actionFromJsonOrError(jsonString).getOrNull()
+
+    /**
+     * Diagnostic-bearing counterpart to [actionFromJson]. Mirrors
+     * [fromJsonOrError] for action payloads so cross-runtime hosts can
+     * use a single failure-handling pattern for both nodes and actions.
+     */
+    fun actionFromJsonOrError(jsonString: String): Result<AmeAction> = try {
+        Result.success(json.decodeFromString(AmeAction.serializer(), jsonString))
+    } catch (e: kotlinx.serialization.SerializationException) {
+        Result.failure(SerializationException("AME action JSON decoding failed: ${e.message}", e))
+    } catch (e: Exception) {
+        Result.failure(SerializationException("Unexpected error during AME action decoding: ${e.message}", e))
     }
 
     private fun canonicalize(jsonString: String, prettyPrint: Boolean = false): String {

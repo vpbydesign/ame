@@ -1,5 +1,6 @@
 package com.agenticmobile.ame.compose
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
@@ -114,12 +115,19 @@ internal fun defaultTextStyle(style: TxtStyle): TextStyle = when (style) {
 /**
  * Maps [BadgeVariant] enum values to background [Color] objects.
  * Mappings follow primitives.md § badge Compose Mapping.
+ *
+ * Bug #14 (WP#5, Path D): SUCCESS and WARNING tokens are mode-aware.
+ * Material 3's standard ColorScheme has no built-in success/warning roles,
+ * so AME branches on [isSystemInDarkTheme] using documented Material green
+ * and orange swatches: 700 (richer, higher contrast) for light mode and
+ * 300 (lighter, lower saturation) for dark mode. See Bug 25 (deferred to
+ * v1.3) for the proper AmeThemeConfig role-family extension.
  */
 @Composable
 internal fun defaultBadgeColor(variant: BadgeVariant): Color = when (variant) {
     BadgeVariant.DEFAULT -> MaterialTheme.colorScheme.surfaceVariant
-    BadgeVariant.SUCCESS -> Color(0xFF4CAF50)
-    BadgeVariant.WARNING -> Color(0xFFFF9800)
+    BadgeVariant.SUCCESS -> if (isSystemInDarkTheme()) Color(0xFF81C784) else Color(0xFF388E3C)
+    BadgeVariant.WARNING -> if (isSystemInDarkTheme()) Color(0xFFFFB74D) else Color(0xFFF57C00)
     BadgeVariant.ERROR -> MaterialTheme.colorScheme.error
     BadgeVariant.INFO -> MaterialTheme.colorScheme.primary
 }
@@ -144,7 +152,13 @@ internal fun defaultBtnColors(style: BtnStyle): ButtonColors = when (style) {
 
 /**
  * Maps [CalloutType] to a composite [CalloutStyle] with background, icon, and tint.
- * SUCCESS/WARNING use canonical Material Design values matching [defaultBadgeColor].
+ *
+ * Bug #14 (WP#5, Path D): WARNING / SUCCESS / TIP are mode-aware. Light
+ * mode uses the Material 3 700-weight tints with their canonical pastel
+ * containers; dark mode uses the Material 3 300-weight tints with desaturated
+ * deep-tone containers tuned for legibility on Material 3 dark surfaces.
+ * INFO and ERROR continue to derive from MaterialTheme.colorScheme so they
+ * inherit the host's dynamic palette unchanged.
  */
 @Composable
 internal fun defaultCalloutStyle(type: CalloutType): CalloutStyle = when (type) {
@@ -154,8 +168,8 @@ internal fun defaultCalloutStyle(type: CalloutType): CalloutStyle = when (type) 
         icon = Icons.Filled.Info
     )
     CalloutType.WARNING -> CalloutStyle(
-        backgroundColor = Color(0xFFFFF3E0),
-        iconTint = Color(0xFFFF9800),
+        backgroundColor = if (isSystemInDarkTheme()) Color(0xFF3E2D1E) else Color(0xFFFFF3E0),
+        iconTint = if (isSystemInDarkTheme()) Color(0xFFFFB74D) else Color(0xFFF57C00),
         icon = Icons.Filled.Warning
     )
     CalloutType.ERROR -> CalloutStyle(
@@ -164,13 +178,13 @@ internal fun defaultCalloutStyle(type: CalloutType): CalloutStyle = when (type) 
         icon = Icons.Filled.Error
     )
     CalloutType.SUCCESS -> CalloutStyle(
-        backgroundColor = Color(0xFFE8F5E9),
-        iconTint = Color(0xFF4CAF50),
+        backgroundColor = if (isSystemInDarkTheme()) Color(0xFF1B3A1F) else Color(0xFFE8F5E9),
+        iconTint = if (isSystemInDarkTheme()) Color(0xFF81C784) else Color(0xFF388E3C),
         icon = Icons.Filled.CheckCircle
     )
     CalloutType.TIP -> CalloutStyle(
-        backgroundColor = Color(0xFFF3E5F5),
-        iconTint = Color(0xFF9C27B0),
+        backgroundColor = if (isSystemInDarkTheme()) Color(0xFF2E1A33) else Color(0xFFF3E5F5),
+        iconTint = if (isSystemInDarkTheme()) Color(0xFFCE93D8) else Color(0xFF7B1FA2),
         icon = Icons.Filled.Lightbulb
     )
 }
@@ -205,14 +219,17 @@ internal fun defaultTimelineStyle(status: TimelineStatus): TimelineStyle = when 
 
 /**
  * Maps [SemanticColor] to Material 3 [Color] objects.
- * SUCCESS and WARNING use canonical Material Design hex values
- * matching [defaultBadgeColor] for visual consistency.
+ *
+ * Bug #14 (WP#5, Path D): SUCCESS and WARNING are mode-aware via
+ * [isSystemInDarkTheme] using the same Material 700/300 swatches as
+ * [defaultBadgeColor] for cross-primitive consistency. PRIMARY, SECONDARY,
+ * and ERROR continue to derive from the host's MaterialTheme.colorScheme.
  */
 @Composable
 internal fun defaultSemanticColor(color: SemanticColor): Color = when (color) {
     SemanticColor.PRIMARY -> MaterialTheme.colorScheme.primary
     SemanticColor.SECONDARY -> MaterialTheme.colorScheme.secondary
     SemanticColor.ERROR -> MaterialTheme.colorScheme.error
-    SemanticColor.SUCCESS -> Color(0xFF4CAF50)
-    SemanticColor.WARNING -> Color(0xFFFF9800)
+    SemanticColor.SUCCESS -> if (isSystemInDarkTheme()) Color(0xFF81C784) else Color(0xFF388E3C)
+    SemanticColor.WARNING -> if (isSystemInDarkTheme()) Color(0xFFFFB74D) else Color(0xFFF57C00)
 }

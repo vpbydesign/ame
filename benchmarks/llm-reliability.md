@@ -16,7 +16,7 @@ This benchmark measures whether LLMs can reliably generate valid AME syntax when
 
 ### System Prompt
 
-The following system prompt (~250 tokens) teaches the model AME syntax. This prompt is itself a deliverable — it represents what a real host app would include in its system instruction to enable AME generation.
+The following system prompt (~250 tokens) teaches the model AME syntax. This prompt is itself a deliverable. It represents what a real host app would include in its system instruction to enable AME generation.
 
 ```
 You generate UI using AME (Agentic Mobile Elements), a compact syntax for describing mobile interfaces.
@@ -149,7 +149,7 @@ POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:co
 
 **Status: Complete.** Benchmark executed on 2026-04-05–06 using automated test
 harness (`LlmReliabilityTest.kt`). Five runs were performed. **Run 5 is
-definitive** — it uses the corrected thinking-model-aware harness, the
+definitive.** It uses the corrected thinking-model-aware harness, the
 improved system prompt, and `gemini-3-flash-preview` (the reference model
 used by a deployed mobile assistant).
 
@@ -274,7 +274,7 @@ score artificially low:
    appropriate and avoids wasting output budget on unnecessary reasoning.
 
 Claude Sonnet 4.6 was unaffected because it has no thinking mode in its
-standard API — `content[0].text` is always the actual response.
+standard API; `content[0].text` is always the actual response.
 
 ### GATE 2 Decision
 
@@ -419,7 +419,7 @@ exposure from the compact system prompt descriptions alone.
 
 **Claude prompt #6 (Music player) action failure:** Claude generated a btn
 with an action the validator flagged as invalid. This is the same stochastic
-action-formatting variance seen in GATE 2 cross-run analysis — parse success
+action-formatting variance seen in GATE 2 cross-run analysis; parse success
 is unaffected. Not a v1.1 regression (prompt #6 is a v1.0 prompt).
 
 **each() generation (prompts 31-32):** Both models successfully generated AME
@@ -457,7 +457,7 @@ be used for model evaluation.
 | 4 | gemini-3-flash-preview | Improved | parts[0], 1024 tokens | 6/20 (30%) | 20/20 |
 
 `gemini-2.5-flash` scored higher in Runs 2-3 because its thinking behavior
-differs from `gemini-3-flash-preview` — it either puts the actual answer in
+differs from `gemini-3-flash-preview`. It either puts the actual answer in
 `parts[0]`, or its default thinking level is less aggressive. The 80-85%
 score was still artificially low due to the token budget issue.
 

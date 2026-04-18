@@ -1130,7 +1130,7 @@ final class AmeParserTests: XCTestCase {
     func testParseChartBar() {
         let result = parse(#"root = chart(bar, values=[10, 20, 30])"#)
         XCTAssertNotNil(result)
-        guard case .chart(let type, let values, _, _, let height, _, _, _, _) = result else {
+        guard case .chart(let type, let values, _, _, let height, _, _, _, _, _) = result else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .bar)
@@ -1141,7 +1141,7 @@ final class AmeParserTests: XCTestCase {
     func testParseChartLine() {
         let result = parse(#"root = chart(line, values=[1.5, 2.5, 3.5], height=300)"#)
         XCTAssertNotNil(result)
-        guard case .chart(let type, let values, _, _, let height, _, _, _, _) = result else {
+        guard case .chart(let type, let values, _, _, let height, _, _, _, _, _) = result else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .line)
@@ -1152,7 +1152,7 @@ final class AmeParserTests: XCTestCase {
     func testParseChartWithColor() {
         let result = parse(#"root = chart(pie, values=[40, 60], color=success)"#)
         XCTAssertNotNil(result)
-        guard case .chart(let type, _, _, _, _, let color, _, _, _) = result else {
+        guard case .chart(let type, _, _, _, _, let color, _, _, _, _) = result else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .pie)
@@ -1162,7 +1162,7 @@ final class AmeParserTests: XCTestCase {
     func testParseChartWithLabels() {
         let result = parse(#"root = chart(bar, values=[10, 20], labels=["A", "B"])"#)
         XCTAssertNotNil(result)
-        guard case .chart(_, _, let labels, _, _, _, _, _, _) = result else {
+        guard case .chart(_, _, let labels, _, _, _, _, _, _, _) = result else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(labels, ["A", "B"])
@@ -1176,7 +1176,7 @@ final class AmeParserTests: XCTestCase {
             {"metrics": [5, 10, 15]}
             """)
         XCTAssertNotNil(result)
-        guard case .chart(_, let values, _, _, _, _, let valuesPath, _, _) = result else {
+        guard case .chart(_, let values, _, _, _, _, let valuesPath, _, _, _) = result else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(values, [5, 10, 15])
@@ -1266,7 +1266,7 @@ final class AmeParserTests: XCTestCase {
     func testParseCallout() {
         let result = parse(#"root = callout(warning, "Careful!")"#)
         XCTAssertNotNil(result)
-        guard case .callout(let type, let content, let title) = result else {
+        guard case .callout(let type, let content, let title, _) = result else {
             XCTFail("Expected callout"); return
         }
         XCTAssertEqual(type, .warning)
@@ -1277,7 +1277,7 @@ final class AmeParserTests: XCTestCase {
     func testParseCalloutWithTitle() {
         let result = parse(#"root = callout(error, "Something failed", "Error")"#)
         XCTAssertNotNil(result)
-        guard case .callout(let type, _, let title) = result else {
+        guard case .callout(let type, _, let title, _) = result else {
             XCTFail("Expected callout"); return
         }
         XCTAssertEqual(type, .error)
@@ -1364,7 +1364,7 @@ final class AmeParserTests: XCTestCase {
     func testParseChartSparkline() {
         let result = parse(#"root = chart(sparkline, values=[1, 2, 3, 4])"#)
         XCTAssertNotNil(result)
-        guard case .chart(let type, let values, _, _, _, _, _, _, _) = result else {
+        guard case .chart(let type, let values, _, _, _, _, _, _, _, _) = result else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .sparkline)
@@ -1374,7 +1374,7 @@ final class AmeParserTests: XCTestCase {
     func testParseChartPie() {
         let result = parse(#"root = chart(pie, values=[30, 50, 20])"#)
         XCTAssertNotNil(result)
-        guard case .chart(let type, let values, _, _, _, _, _, _, _) = result else {
+        guard case .chart(let type, let values, _, _, _, _, _, _, _, _) = result else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .pie)
@@ -1384,7 +1384,7 @@ final class AmeParserTests: XCTestCase {
     func testParseChartUnknownType() {
         let result = parse(#"root = chart(donut, values=[1, 2])"#)
         XCTAssertNotNil(result)
-        guard case .chart(let type, _, _, _, _, _, _, _, _) = result else {
+        guard case .chart(let type, _, _, _, _, _, _, _, _, _) = result else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .bar)
@@ -1393,7 +1393,7 @@ final class AmeParserTests: XCTestCase {
     func testParseChartEmptyValues() {
         let result = parse(#"root = chart(bar)"#)
         XCTAssertNotNil(result)
-        guard case .chart(let type, let values, _, _, _, _, _, _, _) = result else {
+        guard case .chart(let type, let values, _, _, _, _, _, _, _, _) = result else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .bar)
@@ -1403,7 +1403,7 @@ final class AmeParserTests: XCTestCase {
     func testParseChartMultiSeries() {
         let result = parse(#"root = chart(line, series=[[1,2,3],[4,5,6]], labels=["a","b","c"])"#)
         XCTAssertNotNil(result)
-        guard case .chart(let type, _, let labels, let series, _, _, _, _, _) = result else {
+        guard case .chart(let type, _, let labels, let series, _, _, _, _, _, _) = result else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .line)
@@ -1444,7 +1444,7 @@ final class AmeParserTests: XCTestCase {
     func testParseCalloutInfo() {
         let result = parse(#"root = callout(info, "This is informational")"#)
         XCTAssertNotNil(result)
-        guard case .callout(let type, let content, let title) = result else {
+        guard case .callout(let type, let content, let title, _) = result else {
             XCTFail("Expected callout"); return
         }
         XCTAssertEqual(type, .info)
@@ -1460,7 +1460,7 @@ final class AmeParserTests: XCTestCase {
         for (name, expected) in cases {
             let result = parse("root = callout(\(name), \"msg\")")
             XCTAssertNotNil(result, "callout(\(name)) returned nil")
-            guard case .callout(let type, _, _) = result else {
+            guard case .callout(let type, _, _, _) = result else {
                 XCTFail("Expected callout for \(name)"); return
             }
             XCTAssertEqual(type, expected, "callout(\(name)) type mismatch")
@@ -1470,7 +1470,7 @@ final class AmeParserTests: XCTestCase {
     func testParseCalloutUnknownType() {
         let result = parse(#"root = callout(banana, "msg")"#)
         XCTAssertNotNil(result)
-        guard case .callout(let type, _, _) = result else {
+        guard case .callout(let type, _, _, _) = result else {
             XCTFail("Expected callout"); return
         }
         XCTAssertEqual(type, .info)
@@ -1499,7 +1499,7 @@ final class AmeParserTests: XCTestCase {
         guard case .col(let tpl1Children, _) = expanded[0] else { XCTFail("Expected col tpl1"); return }
         guard case .txt(let name1, _, _, _) = tpl1Children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(name1, "Luigi's")
-        guard case .chart(_, let values1, _, _, _, _, let vp1, _, _) = tpl1Children[1] else {
+        guard case .chart(_, let values1, _, _, _, _, let vp1, _, _, _) = tpl1Children[1] else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(values1, [10, 20, 30])
@@ -1508,7 +1508,7 @@ final class AmeParserTests: XCTestCase {
         guard case .col(let tpl2Children, _) = expanded[1] else { XCTFail("Expected col tpl2"); return }
         guard case .txt(let name2, _, _, _) = tpl2Children[0] else { XCTFail("Expected txt"); return }
         XCTAssertEqual(name2, "Bella's")
-        guard case .chart(_, let values2, _, _, _, _, let vp2, _, _) = tpl2Children[1] else {
+        guard case .chart(_, let values2, _, _, _, _, let vp2, _, _, _) = tpl2Children[1] else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(values2, [40, 50, 60])

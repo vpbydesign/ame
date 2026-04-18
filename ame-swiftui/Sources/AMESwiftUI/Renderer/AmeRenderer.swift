@@ -33,7 +33,7 @@ public struct AmeRenderer: View {
         if depth > maxDepth {
             Text("\u{26A0} Max nesting depth exceeded")
                 .font(.caption)
-                .foregroundColor(.red)
+                .foregroundColor(Color(.systemRed))
         } else {
             renderNode(node)
         }
@@ -74,15 +74,15 @@ public struct AmeRenderer: View {
             renderDataList(children, dividers: dividers)
         case .table(let headers, let rows):
             renderTable(headers, rows: rows)
-        case .chart(let type, let values, _, let series, let height, let color, _, _, _):
-            renderChart(type: type, values: values, series: series, height: height, color: color)
+        case .chart(let type, let values, let labels, let series, let height, let color, _, _, _, _):
+            renderChart(type: type, values: values, labels: labels, series: series, height: height, color: color)
         case .code(let language, let content, let title):
             renderCode(language: language, content: content, title: title)
         case .accordion(let title, let children, let expanded):
             renderAccordion(title: title, children: children, expanded: expanded)
         case .carousel(let children, let peek):
             renderCarousel(children: children, peek: peek)
-        case .callout(let type, let content, let title):
+        case .callout(let type, let content, let title, _):
             renderCallout(type: type, content: content, title: title)
         case .timeline(let children):
             renderTimeline(children: children)
@@ -370,8 +370,8 @@ public struct AmeRenderer: View {
     // MARK: - Visualization Primitives
 
     @ViewBuilder
-    private func renderChart(type: ChartType, values: [Double]?, series: [[Double]]?,
-                             height: Int, color: SemanticColor?) -> some View {
+    private func renderChart(type: ChartType, values: [Double]?, labels: [String]?,
+                             series: [[Double]]?, height: Int, color: SemanticColor?) -> some View {
         let data = values ?? []
         let chartColor = color.map { AmeTheme.semanticColor($0) } ?? .accentColor
         if data.isEmpty && (series ?? []).isEmpty {
@@ -381,6 +381,7 @@ public struct AmeRenderer: View {
         } else {
             switch type {
             case .bar:
+                let resolvedLabels: [String]? = (labels?.count == data.count) ? labels : nil
                 Chart {
                     ForEach(Array(data.enumerated()), id: \.offset) { index, value in
                         BarMark(
@@ -390,11 +391,25 @@ public struct AmeRenderer: View {
                         .foregroundStyle(chartColor)
                     }
                 }
+                .chartXAxis {
+                    AxisMarks(values: Array(0..<data.count)) { axisValue in
+                        AxisValueLabel {
+                            if let i = axisValue.as(Int.self),
+                               let resolvedLabels, i < resolvedLabels.count {
+                                Text(resolvedLabels[i])
+                            } else if let i = axisValue.as(Int.self) {
+                                Text("\(i)")
+                            }
+                        }
+                    }
+                }
                 .frame(height: CGFloat(height))
 
             case .line:
+                let allSeries: [[Double]] = series ?? (data.isEmpty ? [] : [data])
+                let xMax: Int = allSeries.map { $0.count }.max() ?? data.count
+                let resolvedLabels: [String]? = (labels?.count == xMax) ? labels : nil
                 Chart {
-                    let allSeries: [[Double]] = series ?? (data.isEmpty ? [] : [data])
                     ForEach(Array(allSeries.enumerated()), id: \.offset) { seriesIdx, seriesData in
                         ForEach(Array(seriesData.enumerated()), id: \.offset) { index, value in
                             LineMark(
@@ -406,33 +421,50 @@ public struct AmeRenderer: View {
                     }
                 }
                 .chartForegroundStyleScale(range: [chartColor, chartColor.opacity(0.6)])
+                .chartXAxis {
+                    AxisMarks(values: Array(0..<xMax)) { axisValue in
+                        AxisValueLabel {
+                            if let i = axisValue.as(Int.self),
+                               let resolvedLabels, i < resolvedLabels.count {
+                                Text(resolvedLabels[i])
+                            } else if let i = axisValue.as(Int.self) {
+                                Text("\(i)")
+                            }
+                        }
+                    }
+                }
                 .frame(height: CGFloat(height))
 
             case .pie:
+                let resolvedLabels: [String]? = (labels?.count == data.count) ? labels : nil
                 if #available(iOS 17.0, macOS 14.0, *) {
                     Chart {
                         ForEach(Array(data.enumerated()), id: \.offset) { index, value in
+                            let sliceName = resolvedLabels?[index] ?? "Slice \(index)"
                             SectorMark(
                                 angle: .value("Value", value)
                             )
-                            .foregroundStyle(by: .value("Slice", "Slice \(index)"))
+                            .foregroundStyle(by: .value("Slice", sliceName))
                         }
                     }
                     .frame(height: CGFloat(height))
                 } else {
                     Chart {
                         ForEach(Array(data.enumerated()), id: \.offset) { index, value in
+                            let sliceName = resolvedLabels?[index] ?? "Slice \(index)"
                             BarMark(
-                                x: .value("Slice", "Slice \(index)"),
+                                x: .value("Slice", sliceName),
                                 y: .value("Value", value)
                             )
-                            .foregroundStyle(by: .value("Slice", "Slice \(index)"))
+                            .foregroundStyle(by: .value("Slice", sliceName))
                         }
                     }
                     .frame(height: CGFloat(height))
                 }
 
             case .sparkline:
+                // Sparkline intentionally ignores labels: axes are hidden per spec
+                // (primitives.md "ignored for sparkline" + Compose AmeChartRenderer parity).
                 Chart {
                     ForEach(Array(data.enumerated()), id: \.offset) { index, value in
                         LineMark(
@@ -517,7 +549,10 @@ public struct AmeRenderer: View {
                                 .frame(width: itemWidth)
                         }
                     }
-                    .padding(.horizontal, 16)
+                    // Mirrors Compose: PaddingValues(start = 16.dp, end = node.peek.dp).
+                    // Trailing inset is the configured peek; no minimum clamp.
+                    .padding(.leading, 16)
+                    .padding(.trailing, CGFloat(peek))
                 }
             }
             .frame(height: 200)
@@ -633,9 +668,18 @@ public struct AmeRenderer: View {
 
 // MARK: - Accordion View (requires @State for expand/collapse)
 
+/// Bug #18 (WP#5): the previous implementation captured `node.expanded`
+/// only at first composition via `State(initialValue:)`, so server-pushed
+/// updates were silently ignored. The fix mirrors the WP#4 Bug 5
+/// separate-state pattern: a non-`@State` `nodeExpanded` field tracks the
+/// latest external value, and `.onChange(of: nodeExpanded)` syncs the
+/// `@State` snapshot when the host re-renders the parent with a new
+/// AmeNode.Accordion. Local user taps still flip `isExpanded` immediately
+/// and persist until the next external change.
 private struct AmeAccordionView: View {
     let title: String
     let children: [AmeNode]
+    let nodeExpanded: Bool
     @State var isExpanded: Bool
     let formState: AmeFormState
     let onAction: (AmeAction) -> Void
@@ -645,6 +689,7 @@ private struct AmeAccordionView: View {
          formState: AmeFormState, onAction: @escaping (AmeAction) -> Void, depth: Int) {
         self.title = title
         self.children = children
+        self.nodeExpanded = initialExpanded
         self._isExpanded = State(initialValue: initialExpanded)
         self.formState = formState
         self.onAction = onAction
@@ -656,6 +701,9 @@ private struct AmeAccordionView: View {
             ForEach(Array(children.enumerated()), id: \.offset) { _, child in
                 AmeRenderer(node: child, formState: formState, onAction: onAction, depth: depth + 1)
             }
+        }
+        .onChange(of: nodeExpanded) { newValue in
+            isExpanded = newValue
         }
     }
 }
@@ -677,7 +725,7 @@ private extension View {
             self.buttonStyle(.plain)
         case .destructive:
             self.buttonStyle(.borderedProminent)
-                .tint(.red)
+                .tint(Color(.systemRed))
         }
     }
 }

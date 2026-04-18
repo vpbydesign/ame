@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This document defines the 21 standard AME primitives — the built-in UI elements
+This document defines the 21 standard AME primitives: the built-in UI elements
 that every conforming AME renderer MUST support. Each primitive is a composable
 building block that maps to a native platform widget.
 
@@ -750,13 +750,13 @@ Button {
 ```
 
 **Accessibility:** The button MUST have a `contentDescription` matching the
-label text. If an `icon` is present, the icon is decorative — the label
+label text. If an `icon` is present, the icon is decorative. The label
 provides the accessible name.
 
 **Security:** Actions dispatched from buttons MUST be routed through the host
 app's trust and confirmation pipeline. The AME renderer MUST NOT execute
-tool calls directly — it dispatches them to the `AmeActionHandler` interface,
-and the host app decides whether to execute, confirm, or block. See
+tool calls directly. Instead, it dispatches them to the `AmeActionHandler`
+interface, and the host app decides whether to execute, confirm, or block. See
 [actions.md](actions.md).
 
 **Error Handling:**
@@ -770,7 +770,7 @@ and the host app decides whether to execute, confirm, or block. See
 ### `input` — Form Input Field
 
 A text entry field for collecting user data. The `id` argument provides a
-unique key for form data binding — see `submit()` action in
+unique key for form data binding. See `submit()` action in
 [actions.md](actions.md).
 
 **Signature:**
@@ -918,7 +918,7 @@ current state (on/off) MUST be announced by screen readers.
 ### `list` — Vertical List
 
 A vertical list of children, optionally separated by dividers. Unlike `col`,
-`list` is semantically a data container — it communicates that the children
+`list` is semantically a data container: it communicates that the children
 are items in a collection.
 
 **Signature:**
@@ -1065,7 +1065,7 @@ its column header (e.g., "Storage: 500 GB").
 ### `chart` — Data Visualization
 
 A data visualization element that renders line, bar, pie, or sparkline charts
-from numeric array data. Charts are read-only static snapshots — no touch
+from numeric array data. Charts are read-only static snapshots: no touch
 interactions, zooming, or animations. They are designed for inline data
 summaries in chat cards, not interactive dashboards.
 
@@ -1080,10 +1080,10 @@ identifier = chart(type, values, labels?, height?, color?)
 |-----|------|------|----------|---------|-------------|
 | 0 | type | ChartType enum | Yes | — | Visualization type |
 | 1 | values | Array of numbers OR `$path` | Yes | — | Primary data series |
-| — | labels | Array of strings OR `$path` (named) | No | none | X-axis labels (ignored for `pie` and `sparkline`) |
+| — | labels | Array of strings OR `$path` (named) | No | none | X-axis labels for `bar`/`line`; slice names for `pie` (Compose: drawn on segment; SwiftUI: shown in legend — see AUDIT_VERDICTS.md Bug 23 for v1.3 visual parity work). Ignored for `sparkline` (axes hidden) |
 | — | series | Array of arrays OR `$path` (named) | No | none | Multiple data series (overrides `values` when present) |
 | — | height | Integer dp (named) | No | `200` | Chart height in dp |
-| — | color | SemanticColor enum (named) | No | `primary` | Primary series color |
+| — | color | SemanticColor enum (named) | No | `null` | Primary series color (renderer falls back to platform primary/accentColor when null) |
 
 **ChartType enum values:**
 
@@ -1207,8 +1207,8 @@ visualization scenarios.
 **Data Size Guidance:** LLMs SHOULD use `$path` references for datasets over
 10 data points. Inline array literals (`values=[1,2,3,...]`) cost
 approximately 2 tokens per value; `$path` references (`values=$amounts`)
-cost 1 token regardless of dataset size. This guidance is non-normative —
-renderers MUST handle arrays of any length.
+cost 1 token regardless of dataset size. This guidance is non-normative.
+Renderers MUST handle arrays of any length.
 
 ---
 
@@ -1233,7 +1233,7 @@ identifier = code(language, content, title?)
 | 1 | content | String | Yes | — | Source code text. Newlines encoded as `\n` per syntax.md Rule 8. |
 | 2 | title | String | No | none | Optional header text (filename, description) |
 
-**Supported language identifiers (minimum set — renderers MAY support more):**
+**Supported language identifiers (minimum set; renderers MAY support more):**
 
 `kotlin`, `swift`, `java`, `python`, `javascript`, `typescript`, `json`,
 `xml`, `html`, `css`, `bash`, `sql`, `rust`, `go`, `c`, `cpp`, `ruby`,
@@ -1264,7 +1264,7 @@ example = code("python", "def quicksort(arr):\n    if len(arr) <= 1:\n        re
 **String Escaping:** The `content` argument uses standard AME string escaping
 (per syntax.md Rule 8). Newlines are `\n`. Quotes are `\"`. Backslashes are
 `\\`. Tabs are `\t`. Multi-line code is encoded as a single string with
-embedded `\n` characters — AME is line-oriented and each statement must be
+embedded `\n` characters. AME is line-oriented and each statement must be
 on one line.
 
 **Compose Mapping:**
@@ -1323,13 +1323,13 @@ VStack(alignment: .leading, spacing: 0) {
 string + comment highlighting for the 5 most common languages (kotlin, swift,
 python, javascript, json). Additional language support is RECOMMENDED but not
 REQUIRED. A conforming renderer MAY render all code as plain monospace if
-syntax highlighting is not available — the code MUST still be readable and
+syntax highlighting is not available. The code MUST still be readable and
 copyable.
 
 **Copy Affordance:** The renderer MUST provide a mechanism to copy the code
 content to the system clipboard. This is typically a small icon button in the
 header or corner of the code block. The copy action is NOT dispatched through
-the host app's action handler — it is an intrinsic renderer behavior (like
+the host app's action handler. It is an intrinsic renderer behavior (like
 text selection), not an AME action.
 
 **Accessibility:** The code block MUST be readable by screen readers. The
@@ -1351,8 +1351,8 @@ is dramatically better.
 **Content Length Guidance:** LLMs SHOULD limit code content to approximately
 30 lines per `code()` block. Longer code SHOULD be split into multiple blocks
 with explanatory text, or the LLM SHOULD offer to display the full code via
-a tool call rather than inlining it. This guidance is non-normative —
-renderers MUST handle code of any length.
+a tool call rather than inlining it. This guidance is non-normative.
+Renderers MUST handle code of any length.
 
 ---
 
@@ -1376,7 +1376,7 @@ identifier = accordion(title, [children], expanded?)
 |-----|------|------|----------|---------|-------------|
 | 0 | title | String | Yes | — | Header text (always visible, toggles children) |
 | 1 | children | Array of identifiers | Yes | — | Content shown/hidden on toggle |
-| 2 | expanded | Boolean | No | `false` | Initial expanded state |
+| 2 | expanded | Boolean | No | `false` | Initial expanded state. v1.2+ runtimes track external updates: if the host re-renders with a changed `expanded` value the UI follows. Local user toggles take effect immediately and persist until the next external change. |
 
 **Example:**
 
@@ -1399,7 +1399,7 @@ title = txt("Frequently Asked Questions", headline)
 q1 = accordion("What is AME?", [a1])
 a1 = txt("AME is a compact syntax for LLMs to generate native mobile UI.", body)
 q2 = accordion("How many primitives are there?", [a2])
-a2 = txt("AME v1.1 has 21 built-in primitives.", body)
+a2 = txt("AME v1.2 has 21 built-in primitives.", body)
 q3 = accordion("Is AME open source?", [a3])
 a3 = txt("Yes, AME is Apache 2.0 licensed.", body)
 ```
@@ -1544,7 +1544,7 @@ SHOULD announce the total item count: "Carousel, 4 items."
 
 **Token Cost:** A `carousel()` call costs ~5 tokens (same as `col()`). The
 children cost the same whether in a carousel or a column. Net token
-difference: 0. The value is UX — horizontal browsing is the standard mobile
+difference: 0. The value is UX. Horizontal browsing is the standard mobile
 pattern for item discovery.
 
 ---
@@ -1649,7 +1649,7 @@ HStack(alignment: .top, spacing: 12) {
 
 **Accessibility:** The callout MUST be announced with its type prefix:
 "Warning: Do not take ibuprofen on an empty stomach." The icon is
-decorative — the type is conveyed through the spoken prefix, not the icon's
+decorative. The type is conveyed through the spoken prefix, not the icon's
 content description.
 
 **Error Handling:**
@@ -1798,7 +1798,7 @@ In Transit."
 
 ### `timeline_item` — Timeline Step
 
-A single step in a `timeline`. Not rendered standalone — MUST be a child of
+A single step in a `timeline`. Not rendered standalone; MUST be a child of
 a `timeline` container. Contains a title, optional subtitle, and a status
 that controls the visual indicator (filled/outlined circle, line style).
 
@@ -1969,7 +1969,7 @@ significantly better visual clarity.
 | `error` | Failed step (error-colored filled circle, solid line) |
 
 Note: `error` is a valid value in `CalloutType`, `TimelineStatus`, and
-`SemanticColor`. The parser disambiguates by argument position — see
+`SemanticColor`. The parser disambiguates by argument position. See
 each primitive's Arguments table for the expected type at each position.
 
 ### SemanticColor
@@ -1984,8 +1984,8 @@ each primitive's Arguments table for the expected type at each position.
 
 SemanticColor is supported as a named `color=` argument on `txt`, `badge`,
 `chart`, and `callout`. When not specified, the primitive uses its default
-theme color. Renderers MUST map these tokens to platform-appropriate colors
-— never to hardcoded hex values.
+theme color. Renderers MUST map these tokens to platform-appropriate colors,
+never to hardcoded hex values.
 
 ---
 

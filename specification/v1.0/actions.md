@@ -4,13 +4,13 @@
 
 Actions define what happens when a user interacts with an AME element. They
 are inline function-call expressions that appear as arguments to interactive
-primitives — primarily `btn` (see [primitives.md](primitives.md)).
+primitives, primarily `btn` (see [primitives.md](primitives.md)).
 
 AME defines five action types. Each action is dispatched to the host
 application via the `AmeActionHandler` interface. The AME renderer MUST NOT
-execute actions directly — it delegates all action handling to the host app,
-which decides whether to execute, confirm, or block the action based on its
-own trust and safety policies.
+execute actions directly. Instead, it delegates all action handling to the host
+app, which decides whether to execute, confirm, or block the action based on
+its own trust and safety policies.
 
 For the syntax rules governing action expressions, see
 [syntax.md](syntax.md), Rule 12.
@@ -28,7 +28,7 @@ interpreted as described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
 ### 1. `tool` — Invoke a Tool
 
 Requests the host app to execute a named tool with the provided arguments.
-This is the primary mechanism for AME elements to trigger side effects —
+This is the primary mechanism for AME elements to trigger side effects:
 creating calendar events, sending messages, saving notes, searching, etc.
 
 **Syntax:**
@@ -87,7 +87,7 @@ When a `tool` action is dispatched:
 ### 2. `uri` — Open a URI
 
 Opens a URI using the platform's default handler. This is the standard
-mechanism for launching external apps — maps, dialer, email client, web
+mechanism for launching external apps: maps, dialer, email client, web
 browser.
 
 **Syntax:**
@@ -151,7 +151,7 @@ app MAY block `file:` and `javascript:` schemes while allowing `geo:`,
 ### 3. `nav` — Navigate Within App
 
 Navigates to a screen or route within the host application. Route names are
-app-defined — the AME spec does not prescribe any standard routes.
+app-defined. The AME spec does not prescribe any standard routes.
 
 **Syntax:**
 ```
@@ -192,7 +192,7 @@ When a `nav` action is dispatched:
 **Notes:**
 
 Route strings are opaque to the AME renderer. The renderer does not validate
-or interpret them — it passes them through to the host app. This allows each
+or interpret them; it passes them through to the host app. This allows each
 host app to define its own route structure.
 
 ---
@@ -430,7 +430,7 @@ sealed interface AmeAction {
 
 Note: `Submit` does not appear in `AmeAction` because the renderer resolves
 it into a `CallTool` before dispatching. The host app never sees a `Submit`
-action — it only sees the resulting `CallTool` with the merged arguments.
+action. It only sees the resulting `CallTool` with the merged arguments.
 
 ---
 
@@ -440,7 +440,7 @@ action — it only sees the resulting `CallTool` with the merged arguments.
 
 Every `tool` action (whether from a `tool()` call or a `submit()` resolution)
 MUST be routed through the host app's trust and confirmation pipeline. The
-AME specification does not define what this pipeline looks like — it is the
+AME specification does not define what this pipeline looks like. It is the
 host app's responsibility.
 
 Examples of trust pipeline behaviors:
@@ -470,7 +470,7 @@ SHOULD display an error if the scheme is blocked.
 
 The `copy()` action is low-risk. Host apps SHOULD execute it immediately
 without confirmation. The copied text SHOULD be exactly what was specified
-in the action argument — the renderer MUST NOT modify or sanitize the text
+in the action argument. The renderer MUST NOT modify or sanitize the text
 (the host app MAY sanitize if needed by its security policy).
 
 ---

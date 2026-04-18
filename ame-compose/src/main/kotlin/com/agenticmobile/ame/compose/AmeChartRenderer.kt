@@ -88,6 +88,82 @@ class CanvasChartRenderer : AmeChartRenderer {
 
 private val MULTI_SERIES_ALPHAS = floatArrayOf(1.0f, 0.75f, 0.55f, 0.4f, 0.3f)
 
+// ── Chart Math (extracted for direct unit testing) ─────────────────────────
+
+/**
+ * Pure chart math utilities, lifted out of the @Composable layer so audit
+ * regression tests can call production code directly instead of mirroring
+ * formulas. Coordinate convention matches Compose Canvas: y=0 at the top,
+ * y=1 at the bottom, in chart-relative units.
+ *
+ * Resolves Bug #4 (a/b/c/d) by guaranteeing that every chart that has a
+ * mix of positive and negative values draws against a visible baseline at
+ * value=0, and that multi-series charts share an X stride so the same
+ * index of every series falls at the same x coordinate.
+ */
+internal object ChartMath {
+
+    /**
+     * Sign-aware data range. The bounds are clamped so the baseline at
+     * value=0 is always present in chart-relative space, even for
+     * all-positive or all-negative data sets.
+     *
+     * @property dataMin Lower bound of the data extent, clamped to <= 0.
+     * @property dataMax Upper bound of the data extent, clamped to >= 0.
+     * @property range dataMax - dataMin, never zero.
+     * @property baselineY Y position of value=0 in chart-relative units
+     *   (0=top, 1=bottom). All-positive data => 1.0; all-negative => 0.0;
+     *   mixed-sign sits between.
+     */
+    data class Range(
+        val dataMin: Double,
+        val dataMax: Double,
+        val range: Double,
+        val baselineY: Float,
+    )
+
+    /** Returns a sign-aware [Range] that always includes 0 as the baseline. */
+    fun computeRange(data: List<Double>): Range {
+        if (data.isEmpty()) {
+            return Range(0.0, 0.0, 1.0, 1f)
+        }
+        val dataMin = data.min().coerceAtMost(0.0)
+        val dataMax = data.max().coerceAtLeast(0.0)
+        val span = (dataMax - dataMin).coerceAtLeast(1e-9)
+        val baselineY = (dataMax / span).toFloat()
+        return Range(dataMin, dataMax, span, baselineY)
+    }
+
+    /**
+     * Returns (yTop, height) for a sign-aware bar in chart-relative units.
+     * Positive values rise from the baseline upward; negative values hang
+     * below the baseline.
+     */
+    fun computeBar(value: Double, range: Range): Pair<Float, Float> {
+        val valueY = ((range.dataMax - value) / range.range).toFloat()
+        return if (value >= 0.0) {
+            Pair(valueY, range.baselineY - valueY)
+        } else {
+            Pair(range.baselineY, valueY - range.baselineY)
+        }
+    }
+
+    /** Returns Y position (0..1, 0=top) for a line-chart point. */
+    fun computeLineY(value: Double, range: Range): Float {
+        return ((range.dataMax - value) / range.range).toFloat()
+    }
+
+    /**
+     * Shared X stride for multi-series charts. Using the LONGEST series'
+     * length means index N of any series falls at the same X coordinate,
+     * even when series lengths differ. Resolves Bug #4d.
+     */
+    fun computeSharedStepX(width: Float, horizontalPadding: Float, maxPoints: Int): Float {
+        val divisor = (maxPoints - 1).coerceAtLeast(1)
+        return (width - horizontalPadding * 2) / divisor
+    }
+}
+
 // ── Bar Chart ──────────────────────────────────────────────────────────────
 
 @Composable
@@ -100,7 +176,7 @@ private fun BarChart(
     modifier: Modifier,
 ) {
     if (data.isEmpty()) return
-    val maxVal = data.max().coerceAtLeast(1.0)
+    val range = ChartMath.computeRange(data)
     val labelTexts = labels ?: emptyList()
 
     Canvas(modifier = modifier) {
@@ -113,9 +189,10 @@ private fun BarChart(
         drawGridLines(chartHeight, size.width, color.copy(alpha = 0.1f))
 
         data.forEachIndexed { index, value ->
-            val barHeight = (value / maxVal * chartHeight).toFloat().coerceAtLeast(2f)
+            val (yTopFrac, heightFrac) = ChartMath.computeBar(value, range)
+            val y = yTopFrac * chartHeight
+            val barHeight = (heightFrac * chartHeight).coerceAtLeast(2f)
             val x = barSpacing + index * (barWidth + barSpacing)
-            val y = chartHeight - barHeight
 
             drawRect(
                 color = color,
@@ -156,7 +233,22 @@ private fun LineChart(
     modifier: Modifier,
 ) {
     val allSeries = if (!series.isNullOrEmpty()) series else if (data.isNotEmpty()) listOf(data) else return
-    val globalMax = allSeries.flatten().maxOrNull()?.coerceAtLeast(1.0) ?: return
+
+    // Bug #4c: a line chart needs at least one series with >= 2 points to
+    // draw anything meaningful. If every series is too short (e.g. a single
+    // point), render the documented empty-state instead of the previous
+    // silent blank canvas.
+    if (allSeries.none { it.size >= 2 }) {
+        Text(
+            text = "No chart data",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier.padding(16.dp)
+        )
+        return
+    }
+
+    val range = ChartMath.computeRange(allSeries.flatten())
     val maxPoints = allSeries.maxOf { it.size }
     val labelTexts = labels ?: emptyList()
 
@@ -164,31 +256,33 @@ private fun LineChart(
         val bottomPadding = if (labelTexts.isNotEmpty()) 20f else 4f
         val chartHeight = size.height - bottomPadding
         val horizontalPadding = 16f
+        // Bug #4d: stride is computed from the LONGEST series so index N of
+        // every series maps to the same x coordinate. Series shorter than
+        // maxPoints simply end earlier in the chart width.
+        val stepX = ChartMath.computeSharedStepX(size.width, horizontalPadding, maxPoints)
 
         drawGridLines(chartHeight, size.width, color.copy(alpha = 0.1f))
 
         allSeries.forEachIndexed { seriesIdx, seriesData ->
             if (seriesData.size < 2) return@forEachIndexed
             val seriesColor = color.copy(alpha = MULTI_SERIES_ALPHAS.getOrElse(seriesIdx) { 0.3f })
-            val stepX = (size.width - horizontalPadding * 2) / (seriesData.size - 1).coerceAtLeast(1)
 
             val path = Path()
             seriesData.forEachIndexed { i, value ->
                 val x = horizontalPadding + i * stepX
-                val y = chartHeight - (value / globalMax * chartHeight).toFloat()
+                val y = ChartMath.computeLineY(value, range) * chartHeight
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
             drawPath(path, seriesColor, style = Stroke(width = 2.dp.toPx()))
 
             seriesData.forEachIndexed { i, value ->
                 val x = horizontalPadding + i * stepX
-                val y = chartHeight - (value / globalMax * chartHeight).toFloat()
+                val y = ChartMath.computeLineY(value, range) * chartHeight
                 drawCircle(seriesColor, radius = 3.dp.toPx(), center = Offset(x, y))
             }
         }
 
         if (labelTexts.isNotEmpty() && maxPoints > 0) {
-            val stepX = (size.width - horizontalPadding * 2) / (maxPoints - 1).coerceAtLeast(1)
             labelTexts.take(maxPoints).forEachIndexed { i, label ->
                 val x = horizontalPadding + i * stepX
                 val labelResult = textMeasurer.measure(

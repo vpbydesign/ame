@@ -25,6 +25,18 @@ class AmeParser {
     private val _warnings = mutableListOf<String>()
     private val _errors = mutableListOf<String>()
 
+    // Streaming-mode data section state (Bug 8). When parseLine() is the only
+    // ingest API in use, calling parseLine("---") flips streamingDataMode on,
+    // and subsequent parseLine() calls accumulate into streamingDataBuffer
+    // until getResolvedTree() finalizes by parsing the buffer through
+    // parseDataSection. streamingDataApplied guards idempotence so repeated
+    // getResolvedTree() calls do not re-parse the buffer. The batch parse(
+    // input: String) entry path manages its own dataLines accumulator and
+    // never trips this state machine.
+    private var streamingDataMode: Boolean = false
+    private val streamingDataBuffer: StringBuilder = StringBuilder()
+    private var streamingDataApplied: Boolean = false
+
     val warnings: List<String> get() = _warnings.toList()
     val errors: List<String> get() = _errors.toList()
 
@@ -66,7 +78,35 @@ class AmeParser {
         val trimmed = line.trim()
         if (trimmed.isEmpty()) return null
         if (trimmed.startsWith("//")) return null
-        if (trimmed == AmeKeywords.DATA_SEPARATOR) return null
+        if (trimmed == AmeKeywords.DATA_SEPARATOR) {
+            // Bug 8: flip streaming-mode data accumulator on. Subsequent
+            // parseLine() calls feed streamingDataBuffer until the next
+            // reset(). Mirrors the batch parse() warning when the separator
+            // is seen twice on the same parser lifetime.
+            if (streamingDataMode) {
+                _warnings.add("Multiple --- separators found; ignoring subsequent ones")
+            } else {
+                streamingDataMode = true
+                streamingDataApplied = false
+            }
+            return null
+        }
+        if (streamingDataMode) {
+            // Disambiguate JSON content from AME identifier definitions in
+            // streaming mode. AME identifiers are required to start with a
+            // letter (see the identifier-shape check below at parseLine
+            // body), so a letter-prefixed line is AME and anything else
+            // (`{`, `}`, `[`, `]`, `"`, digit, sign, whitespace) accumulates
+            // into the JSON buffer. This lets streaming consumers emit
+            // either order: AME-then-`---`-then-JSON (mirrors batch parse()),
+            // or `---`-then-JSON-then-AME (the audit test's contract).
+            val firstChar = trimmed.first()
+            if (!firstChar.isLetter()) {
+                streamingDataBuffer.append(line).append('\n')
+                return null
+            }
+            // Falls through to AME identifier handling below.
+        }
 
         val equalsIndex = trimmed.indexOf('=')
         if (equalsIndex == -1) {
@@ -81,6 +121,20 @@ class AmeParser {
             _errors.add("Invalid identifier '$identifier' on line: $trimmed")
             return null
         }
+
+        // Bug 9 (v1.2 resolution): syntax.md previously listed every enum value
+        // token (TxtStyle, BtnStyle, BadgeVariant, InputType, ChartType,
+        // CalloutType, TimelineStatus, SemanticColor, plus Align) as reserved.
+        // Path D of WP#3 retracts that over-aggressive rule because the parser
+        // already disambiguates by argument position: `title` on the LHS of
+        // `=` is always a registry key, while `title` as a positional argument
+        // to `txt(...)` is always evaluated against the TxtStyle enum first.
+        // Common identifiers like `title`, `label`, `body`, `text`, `default`
+        // are now legal as user-defined identifiers without restriction.
+        // The remaining reserved tokens (primitives, action names, structural
+        // keywords, boolean literals) ARE genuine collisions that would
+        // shadow RHS constructs, but we leave their enforcement to a separate
+        // future WP if and when the audit demonstrates a real impact.
 
         if (registry.containsKey(identifier)) {
             _warnings.add("Duplicate identifier '$identifier' — replacing previous definition")
@@ -101,9 +155,23 @@ class AmeParser {
         dataModel = null
         _warnings.clear()
         _errors.clear()
+        streamingDataMode = false
+        streamingDataBuffer.clear()
+        streamingDataApplied = false
     }
 
-    fun getResolvedTree(): AmeNode? = registry["root"]?.let { resolveTree(it) }
+    fun getResolvedTree(): AmeNode? {
+        // Bug 8: finalize the streaming data buffer (if any) before resolving.
+        // Guarded by `dataModel == null` so a prior batch parse() that already
+        // populated dataModel takes precedence (mixed-mode safety, per the
+        // streaming.md contract). Guarded by `!streamingDataApplied` so
+        // repeated getResolvedTree() calls are idempotent.
+        if (streamingDataBuffer.isNotEmpty() && dataModel == null && !streamingDataApplied) {
+            parseDataSection(streamingDataBuffer.toString())
+            streamingDataApplied = true
+        }
+        return registry["root"]?.let { resolveTree(it) }
+    }
 
     fun getRegistry(): Map<String, AmeNode> = registry.toMap()
 
@@ -444,10 +512,22 @@ class AmeParser {
 
         var series: List<List<Double>>? = null
         var seriesPath: String? = null
+        var seriesPaths: List<String>? = null
         val seriesArg = named["series"]
         when (seriesArg) {
             is ParsedValue.DataRef -> seriesPath = seriesArg.path
-            is ParsedValue.Arr -> series = resolveNestedDoubleListArg(seriesArg)
+            is ParsedValue.Arr -> {
+                // Disambiguate: if every element parses to a $path reference,
+                // treat as array-of-paths (Bug 7); otherwise fall back to the
+                // existing literal nested-numeric-array handling.
+                val parsedItems = seriesArg.items.map { parseArgValue(it.trim()) }
+                val allDataRefs = parsedItems.isNotEmpty() && parsedItems.all { it is ParsedValue.DataRef }
+                if (allDataRefs) {
+                    seriesPaths = parsedItems.map { (it as ParsedValue.DataRef).path }
+                } else {
+                    series = resolveNestedDoubleListArg(seriesArg)
+                }
+            }
             else -> {}
         }
 
@@ -457,7 +537,8 @@ class AmeParser {
         return AmeNode.Chart(
             type = type, values = values, labels = labels, series = series,
             height = height, color = color,
-            valuesPath = valuesPath, labelsPath = labelsPath, seriesPath = seriesPath
+            valuesPath = valuesPath, labelsPath = labelsPath,
+            seriesPath = seriesPath, seriesPaths = seriesPaths
         )
     }
 
@@ -485,7 +566,8 @@ class AmeParser {
         val type = pos.getOrNull(0)?.let { resolveCalloutTypeArg(it) } ?: CalloutType.INFO
         val content = resolveStringArg(pos.getOrNull(1))
         val title = pos.getOrNull(2)?.let { resolveStringArgNullable(it) }
-        return AmeNode.Callout(type = type, content = content, title = title)
+        val color = named["color"]?.let { resolveSemanticColorArg(it) }
+        return AmeNode.Callout(type = type, content = content, title = title, color = color)
     }
 
     private fun buildTimeline(pos: List<ParsedValue>, named: Map<String, ParsedValue>): AmeNode.Timeline {
@@ -853,11 +935,27 @@ class AmeParser {
         val trimmed = input.trim()
         if (!trimmed.startsWith("[")) return emptyList()
 
-        // Find matching ]
+        // Find matching ] respecting string literals so a `]` inside a `"..."`
+        // value does not prematurely close the array (Bug 3b).
         var depth = 0
         var endIdx = -1
+        var inString = false
+        var escaped = false
         for (i in trimmed.indices) {
-            when (trimmed[i]) {
+            val c = trimmed[i]
+            if (escaped) {
+                escaped = false
+                continue
+            }
+            if (inString) {
+                when (c) {
+                    '\\' -> escaped = true
+                    '"' -> inString = false
+                }
+                continue
+            }
+            when (c) {
+                '"' -> inString = true
                 '[' -> depth++
                 ']' -> {
                     depth--
@@ -1022,9 +1120,24 @@ class AmeParser {
     private fun extractParenContent(input: String, openIndex: Int): String {
         var depth = 0
         var closeIndex = -1
+        var inString = false
+        var escaped = false
 
         for (i in openIndex until input.length) {
-            when (input[i]) {
+            val c = input[i]
+            if (escaped) {
+                escaped = false
+                continue
+            }
+            if (inString) {
+                when (c) {
+                    '\\' -> escaped = true
+                    '"' -> inString = false
+                }
+                continue
+            }
+            when (c) {
+                '"' -> inString = true
                 '(' -> depth++
                 ')' -> {
                     depth--
@@ -1067,17 +1180,37 @@ class AmeParser {
 
     // ── Tree Resolution (Forward Refs, $path, each() expansion) ────────
 
-    private fun resolveTree(node: AmeNode, scope: JsonObject? = dataModel): AmeNode {
+    /**
+     * Resolves Ref nodes against the registry and `$path` data references
+     * against `scope`. The [visited] set carries the chain of ref ids that
+     * are currently being dereferenced down a single branch of the tree;
+     * when a Ref's id appears in [visited] we treat it as a cycle and leave
+     * the node unresolved (Bug 11). The set is immutable per call so sibling
+     * branches and diamond-ref patterns (`a -> c, b -> c`) resolve
+     * independently rather than poisoning each other.
+     */
+    private fun resolveTree(
+        node: AmeNode,
+        scope: JsonObject? = dataModel,
+        visited: Set<String> = emptySet()
+    ): AmeNode {
         return when (node) {
-            is AmeNode.Col -> node.copy(children = resolveChildren(node.children, scope))
-            is AmeNode.Row -> node.copy(children = resolveChildren(node.children, scope))
-            is AmeNode.Card -> node.copy(children = resolveChildren(node.children, scope))
-            is AmeNode.DataList -> node.copy(children = resolveChildren(node.children, scope))
-            is AmeNode.Ref -> registry[node.id]?.let { resolveTree(it, scope) } ?: node
+            is AmeNode.Col -> node.copy(children = resolveChildren(node.children, scope, visited))
+            is AmeNode.Row -> node.copy(children = resolveChildren(node.children, scope, visited))
+            is AmeNode.Card -> node.copy(children = resolveChildren(node.children, scope, visited))
+            is AmeNode.DataList -> node.copy(children = resolveChildren(node.children, scope, visited))
+            is AmeNode.Ref -> {
+                if (node.id in visited) {
+                    _warnings.add("Ref cycle detected at '${node.id}'; leaving unresolved")
+                    node
+                } else {
+                    registry[node.id]?.let { resolveTree(it, scope, visited + node.id) } ?: node
+                }
+            }
             is AmeNode.Each -> {
                 if (scope == null) node
                 else {
-                    val expanded = expandEach(node, scope)
+                    val expanded = expandEach(node, scope, visited)
                     if (expanded.size == 1) expanded[0]
                     else AmeNode.Col(children = expanded)
                 }
@@ -1089,11 +1222,11 @@ class AmeParser {
             is AmeNode.Btn -> if (scope != null) node.copy(label = resolvePathInScope(node.label, scope)) else node
             is AmeNode.Icon -> if (scope != null) node.copy(name = resolvePathInScope(node.name, scope)) else node
             is AmeNode.Accordion -> node.copy(
-                children = resolveChildren(node.children, scope),
+                children = resolveChildren(node.children, scope, visited),
                 title = if (scope != null) resolvePathInScope(node.title, scope) else node.title
             )
-            is AmeNode.Carousel -> node.copy(children = resolveChildren(node.children, scope))
-            is AmeNode.Timeline -> node.copy(children = resolveChildren(node.children, scope))
+            is AmeNode.Carousel -> node.copy(children = resolveChildren(node.children, scope, visited))
+            is AmeNode.Timeline -> node.copy(children = resolveChildren(node.children, scope, visited))
             is AmeNode.Callout -> if (scope != null) node.copy(
                 content = resolvePathInScope(node.content, scope),
                 title = node.title?.let { resolvePathInScope(it, scope) }
@@ -1110,29 +1243,51 @@ class AmeParser {
                 node.copy(
                     values = node.values ?: node.valuesPath?.let { resolveDoubleArrayInScope(it, scope) },
                     labels = node.labels ?: node.labelsPath?.let { resolveStringArrayInScope(it, scope) },
-                    series = node.series ?: node.seriesPath?.let { resolveNestedDoubleArrayInScope(it, scope) },
+                    series = node.series
+                        ?: node.seriesPath?.let { resolveNestedDoubleArrayInScope(it, scope) }
+                        ?: node.seriesPaths?.let { paths ->
+                            // All-or-nothing: every path must resolve. Mismatched array
+                            // lengths within successfully-resolved paths are preserved
+                            // verbatim (matches existing literal-series behavior).
+                            paths.mapNotNull { resolveDoubleArrayInScope(it, scope) }
+                                .takeIf { it.size == paths.size }
+                        },
                     valuesPath = null,
                     labelsPath = null,
-                    seriesPath = null
+                    seriesPath = null,
+                    seriesPaths = null
                 )
             } else node
             else -> node
         }
     }
 
-    private fun resolveChildren(children: List<AmeNode>, scope: JsonObject?): List<AmeNode> {
+    private fun resolveChildren(
+        children: List<AmeNode>,
+        scope: JsonObject?,
+        visited: Set<String> = emptySet()
+    ): List<AmeNode> {
         return children.map { child ->
             when (child) {
                 is AmeNode.Ref -> {
-                    val resolved = registry[child.id]
-                    if (resolved != null) resolveTree(resolved, scope) else child
+                    if (child.id in visited) {
+                        _warnings.add("Ref cycle detected at '${child.id}'; leaving unresolved")
+                        child
+                    } else {
+                        val resolved = registry[child.id]
+                        if (resolved != null) resolveTree(resolved, scope, visited + child.id) else child
+                    }
                 }
-                else -> resolveTree(child, scope)
+                else -> resolveTree(child, scope, visited)
             }
         }
     }
 
-    private fun expandEach(node: AmeNode.Each, parentScope: JsonObject?): List<AmeNode> {
+    private fun expandEach(
+        node: AmeNode.Each,
+        parentScope: JsonObject?,
+        visited: Set<String> = emptySet()
+    ): List<AmeNode> {
         val array = resolveDataArray(node.dataPath, parentScope)
             ?: return emptyList()
         if (array.isEmpty()) return emptyList()
@@ -1145,7 +1300,7 @@ class AmeParser {
 
         return array.mapNotNull { element ->
             when (element) {
-                is JsonObject -> resolveTree(template, element)
+                is JsonObject -> resolveTree(template, element, visited)
                 else -> {
                     _warnings.add("each() array element is not a JSON object")
                     null

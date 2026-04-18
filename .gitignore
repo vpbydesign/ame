@@ -7,3 +7,10 @@ build/
 local.properties
 .build/
 .swiftpm/
+
+# Internal-only engineering process artifacts (never push to public repo).
+# These are working notes and handoff documents, not part of the AME spec
+# or the reference implementation. They live on contributors' local machines
+# only.
+WP*_COMPLETION_REPORT.md
+ANNOUNCEMENT_*_DRAFT.md

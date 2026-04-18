@@ -119,6 +119,17 @@ object AmeKeywords {
 
     const val DATA_SEPARATOR: String = "---"
 
+    /**
+     * True when [identifier] is one of the four genuine reserved-token classes:
+     * standard primitive names, action names, structural keywords (`each`,
+     * `root`), or boolean literals.
+     *
+     * Note (v1.2 / Bug 9): enum-value tokens (`title`, `primary`, `done`, etc.)
+     * are NOT reserved and MAY be used as user-defined identifiers. The parser
+     * disambiguates by argument position. See `specification/v1.0/syntax.md`
+     * Reserved Keywords section for the canonical list and the rationale for
+     * NOT reserving enum-value tokens.
+     */
     fun isReserved(identifier: String): Boolean =
         identifier in STANDARD_PRIMITIVES ||
             identifier in ACTION_NAMES ||

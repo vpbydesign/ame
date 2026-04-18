@@ -3,13 +3,13 @@
 > A compact syntax for LLMs to generate native mobile UI on the fly
 
 AME is a line-oriented markup that LLMs stream token-by-token. A mobile
-renderer turns each line into a native component the moment it arrives —
-no JSON parsing, no WebView, no round-trip.
+renderer turns each line into a native component the moment it arrives.
+There is no JSON parsing, no WebView, no round-trip.
 
 ## How AME Works
 
 An LLM returns AME text instead of plain prose when the user needs a rich,
-interactive answer. Each line defines one UI element — the renderer builds
+interactive answer. Each line defines one UI element. The renderer builds
 the screen progressively as tokens arrive.
 
 **LLM output (8 lines, 188 tokens):**
@@ -27,8 +27,8 @@ submit_btn = btn("Reserve", submit(book_table))
 
 **What the user sees:** a native Material 3 form with four text inputs and a
 "Reserve" button. Tapping the button collects form values and routes them
-through the host app's tool-call pipeline — same confirmation flow as any
-other LLM-initiated action.
+through the host app's tool-call pipeline. The same confirmation flow applies
+as for any other LLM-initiated action.
 
 [More examples →](examples/)
 
@@ -116,7 +116,7 @@ documentation and measured token counts.
 
 ## Specification
 
-The complete AME v1.1 specification: [specification/v1.0/](specification/v1.0/README.md)
+The complete AME v1.2 specification: [specification/v1.0/](specification/v1.0/README.md)
 
 | Document | Description |
 |----------|-------------|
@@ -127,13 +127,44 @@ The complete AME v1.1 specification: [specification/v1.0/](specification/v1.0/RE
 | [data-binding.md](specification/v1.0/data-binding.md) | $path references, --- separator, each() templates |
 | [tier-zero.md](specification/v1.0/tier-zero.md) | Zero-token tool-driven rendering |
 | [integration.md](specification/v1.0/integration.md) | Host app capability declaration and system prompt guidance |
+| [conformance.md](specification/v1.0/conformance.md) | Conformance levels (Core, Streaming, Strict), test catalog, self-verification |
+| [regression-protocol.md](specification/v1.0/regression-protocol.md) | Defect lifecycle, conformance impact, BREAKING-CONFORMANCE workflow |
+
+## Quality and Testing
+
+AME maintains a three-tier test discipline:
+
+1. **Unit tests** in each module: parser, serializer, renderer logic
+   (`./gradlew :ame-core:test`, `cd ame-swiftui && swift test`).
+2. **Conformance suite**: 57 canonical `.ame` to JSON cases in
+   [conformance/](conformance/), verified via
+   [`conformance/check-parity.sh`](conformance/check-parity.sh). The
+   parity script is multi-runtime: each runtime port appears as a one-line
+   entry in the script's `RUNTIMES` array, runs independently per fixture,
+   and contributes its PASS/FAIL column to the matrix output.
+3. **Audit regression suite**: one test per known historical defect, listed
+   in [AUDIT_VERDICTS.md](AUDIT_VERDICTS.md). Run via `./verify-bugs.sh`.
+
+Cross-runtime parity at the JSON serialization level is enforced by the
+57-case conformance suite. Individual runtime implementations may add
+internal property-based or fuzz testing as their own quality concern; this
+is not an AME standard requirement.
+
+The conformance methodology is in
+[specification/v1.0/conformance.md](specification/v1.0/conformance.md).
+The defect lifecycle and discipline rules are in
+[specification/v1.0/regression-protocol.md](specification/v1.0/regression-protocol.md).
+The pre-release gate is in [RELEASE.md](RELEASE.md).
+
+Reporting a bug or proposing a fix? See [CONTRIBUTING.md](CONTRIBUTING.md).
+The AME project requires a failing test before any defect is acted on.
 
 ## Benchmarks
 
 ### Token Efficiency
 
 Measured with Gemini `gemini-2.0-flash` tokenizer. Every number below is a
-measured integer from the `countTokens` API — no estimates, no rounding.
+measured integer from the `countTokens` API. No estimates, no rounding.
 
 | UI Scenario | AME | A2UI v0.9 | Savings |
 |-------------|-----|-----------|---------|
@@ -212,4 +243,4 @@ The following limitations are known and planned for future versions:
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE)
+Apache 2.0. See [LICENSE](LICENSE).

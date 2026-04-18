@@ -1,6 +1,8 @@
-# AME Specification — Version 1.1
+# AME Specification — Version 1.2
 
-The AME v1.1 specification defines a compact, streaming-first syntax for
+> Directory name `v1.0` is the layout version, retained for backlink stability across releases. Spec contents reflect the current AME version (see Version History at the bottom of this page).
+
+The AME v1.2 specification defines a compact, streaming-first syntax for
 describing interactive user interfaces, designed for LLM generation and
 native mobile rendering.
 
@@ -15,51 +17,48 @@ native mobile rendering.
 | [data-binding.md](data-binding.md) | $path references, --- separator, each() templates |
 | [tier-zero.md](tier-zero.md) | Zero-token and layout-hint rendering (Tier 0 and Tier 1) |
 | [integration.md](integration.md) | Capability declaration, system prompts, MCP/A2A integration |
+| [conformance.md](conformance.md) | Conformance levels, test catalog, self-verification procedure |
+| [regression-protocol.md](regression-protocol.md) | Defect lifecycle, conformance impact, BREAKING-CONFORMANCE workflow |
 
 ## Conformance
 
-AME defines two conformance levels. Implementations claiming AME support
-SHOULD state which level they conform to.
+AME defines three conformance levels: Core, Streaming, and Strict.
+The complete conformance methodology, including the 57-case test catalog,
+self-verification procedure, the multi-runtime extension procedure, and
+rules for adding or changing conformance tests, is consolidated in
+[conformance.md](conformance.md).
 
-### AME Core Conformance
+AME has reference implementations in Kotlin (Compose) and Swift (SwiftUI).
+Additional runtime ports follow the procedure in
+[conformance.md](conformance.md) §5; the multi-runtime parity script
+[`conformance/check-parity.sh`](../../conformance/check-parity.sh) accepts
+new runtimes via a one-line configuration entry.
 
-An implementation claims AME Core Conformance when:
+Implementations claiming AME support MUST state the highest level they
+conform to. See `conformance.md` §1 for full requirements per level and
+§3 for the self-verification procedure.
 
-1. **Parser** handles all 21 standard primitives defined in
-   [primitives.md](primitives.md), plus `each()` from
-   [data-binding.md](data-binding.md), plus `Ref` for forward references.
-2. **Parser** handles the `---` data separator and resolves `$path`
-   references against the data model.
-3. **Parser** implements all error recovery rules from
-   [syntax.md](syntax.md) (unknown component, unclosed parenthesis,
-   unclosed string, malformed line, duplicate identifier, invalid number,
-   invalid enum value). The parser MUST NOT crash on any input.
-4. **Renderer** displays all 21 standard primitives as native platform
-   widgets.
-5. **Renderer** dispatches all actions through the `AmeActionHandler`
-   interface (or platform equivalent).
-6. All 9 example `.ame` files in the `examples/` directory parse and
-   render without errors.
+## Quality and Defect Discipline
 
-### AME Streaming Conformance
+The AME project enforces a normative process for finding, verifying, and
+fixing defects, documented in
+[regression-protocol.md](regression-protocol.md). Highlights:
 
-An implementation claims AME Streaming Conformance when it meets all
-AME Core Conformance requirements AND:
+- Every claimed defect MUST become a failing test before any fix is scoped.
+- Every fix MUST leave the failing test passing AND keep it as a
+  permanent regression in CI.
+- Changes to conformance JSON output that affect existing test cases MUST
+  carry the `BREAKING-CONFORMANCE` PR label and trigger a minimum minor
+  version bump on the next release.
 
-1. **Parser** supports incremental parsing via a `parseLine()` method
-   (or equivalent) that processes one line at a time.
-2. **Renderer** shows skeleton placeholders for unresolved `Ref` nodes.
-3. **Renderer** replaces skeletons with rendered components when the
-   defining statement arrives.
-4. Forward references resolve correctly regardless of emission order
-   (top-down, bottom-up, or mixed).
-
-Streaming Conformance is OPTIONAL. Implementations that only support
-batch parsing (entire document at once) claim Core Conformance only.
+The canonical record of every claim and its verdict (REAL / NOT REAL /
+INCONCLUSIVE) lives at
+[`AUDIT_VERDICTS.md`](../../AUDIT_VERDICTS.md) at the repository root.
 
 ## Version History
 
 | Version | Date | Status |
 |---------|------|--------|
 | 1.0 | 2026-04-05 | Superseded by v1.1 |
-| 1.1 | 2026-04-11 | Current |
+| 1.1 | 2026-04-11 | Superseded by v1.2 |
+| 1.2 | 2026-04-18 | Current. Audit fixes, conformance methodology, AME Strict Conformance level, multi-runtime conformance tooling. |

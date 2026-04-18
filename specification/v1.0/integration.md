@@ -5,7 +5,7 @@
 AME is a UI description language, not a transport protocol. It defines what an
 LLM outputs (the syntax) and how a renderer behaves (the rendering contract),
 but it does not define how the AME document travels from the LLM to the
-renderer. This is intentional — AME is designed to ride on top of existing
+renderer. This is intentional. AME is designed to ride on top of existing
 protocols (MCP, A2A, direct API calls) rather than replacing them.
 
 This document defines the integration layer: how host applications declare
@@ -41,14 +41,14 @@ for a given client and which primitives they may use.
 
 ### Declaration Format
 
-The declaration format is intentionally simple — two key-value fields that
+The declaration format is intentionally simple: two key-value fields that
 can be embedded in any capability context.
 
 **As plain text** (for system prompts, documentation, or human-readable
 capability lists):
 
 ```
-AME_SUPPORT: v1.1
+AME_SUPPORT: v1.2
 AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress, chart, code, accordion, carousel, callout, timeline
 ```
 
@@ -95,7 +95,7 @@ AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, ta
 **Example with custom components:**
 
 ```
-AME_SUPPORT: v1.1
+AME_SUPPORT: v1.2
 AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress, chart, code, accordion, carousel, callout, timeline, MapView, AudioPlayer, VideoCard
 ```
 
@@ -107,7 +107,7 @@ markdown, or whatever UI format the client does support.
 
 This rule prevents AME output from being sent to clients that cannot render
 it. A client that does not declare AME support will receive AME syntax as
-gibberish — there is no graceful degradation without the declaration.
+gibberish. There is no graceful degradation without the declaration.
 
 ---
 
@@ -120,7 +120,7 @@ the AME syntax and listing the available primitives.
 ### Standard AME Prompt Section
 
 The following is the RECOMMENDED system prompt section for host apps that
-support AME v1.1 with the standard 21 primitives. It is designed to be
+support AME v1.2 with the standard 21 primitives. It is designed to be
 compact (~350-400 tokens) while being sufficient for the LLM to generate
 valid AME syntax.
 
@@ -130,7 +130,7 @@ When you want to show rich interactive UI (cards, forms, lists, buttons,
 charts, timelines), generate an AME document. AME is a line-oriented syntax
 where each line binds an identifier to a component.
 
-AME_SUPPORT: v1.1
+AME_SUPPORT: v1.2
 AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress, chart, code, accordion, carousel, callout, timeline
 
 Rules:
@@ -226,7 +226,7 @@ with `?` are optional. Parameters with `= default` have a default value.
 **Examples:**
 
 ```
-AME_SUPPORT: v1.1
+AME_SUPPORT: v1.2
 AME_CATALOG: col, row, txt, btn, card, badge, icon, img, input, toggle, list, table, divider, spacer, progress, chart, code, accordion, carousel, callout, timeline, MapView, AudioPlayer, RecipeCard
 AME_CUSTOM: MapView(center: string, zoom?: number = 14, markers?: array, height?: number = 200)
 AME_CUSTOM: AudioPlayer(url: string, title?: string, autoplay?: boolean = false)
@@ -291,7 +291,7 @@ results:" as text, and everything from `root = ` onward as AME UI.
 For host applications using the
 [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) as their
 agent-to-tool communication layer, AME integrates as a rendering format for
-tool results — not as a replacement for MCP.
+tool results, not as a replacement for MCP.
 
 ### Architecture
 
@@ -337,7 +337,7 @@ during the `initialize` handshake:
 
 MCP servers MAY read this capability to determine whether the client can
 render AME. However, since MCP servers typically provide tools (not UI),
-this capability is primarily informational — it tells the server that tool
+this capability is primarily informational: it tells the server that tool
 result data MAY be rendered as rich UI by the client.
 
 ### AME vs MCP Apps
@@ -442,7 +442,7 @@ integrates through the system prompt alone.
    `uri()`, `nav()`, `copy()`, and resolved `submit()` actions to the
    appropriate app systems.
 
-This is the simplest integration path — no protocol, no capability
+This is the simplest integration path: no protocol, no capability
 negotiation, no server. The LLM learns AME from the system prompt and
 generates it when appropriate. The host app parses and renders it locally.
 
@@ -466,7 +466,7 @@ without any LLM awareness of AME syntax.
 
 ## Version Negotiation
 
-AME uses a simple version negotiation model. There is no handshake — the
+AME uses a simple version negotiation model. There is no handshake. The
 client declares its version, and agents respect it.
 
 ### Rules
@@ -519,7 +519,7 @@ a spec-level requirement.
 
 ## AME's Relationship to Other Specifications
 
-AME is a UI description language — it defines the syntax (what to write) and
+AME is a UI description language: it defines the syntax (what to write) and
 the rendering contract (how to display it). It is not a transport protocol,
 not an agent communication protocol, and not an application hosting model.
 
@@ -549,7 +549,7 @@ AME can coexist with all of the above:
 
 ### AME Declaration Trust
 
-The `AME_SUPPORT` and `AME_CATALOG` declarations are informational — they
+The `AME_SUPPORT` and `AME_CATALOG` declarations are informational. They
 tell agents what the client can render. They do not grant permissions or
 authorize actions. All security enforcement happens at the action dispatch
 layer (see [actions.md](actions.md) Security Model):
@@ -562,13 +562,13 @@ layer (see [actions.md](actions.md) Security Model):
 
 The AME system prompt section is included in the LLM's system instruction,
 which is controlled by the host app. There is no risk of external parties
-injecting AME capability declarations — the host app decides whether to
+injecting AME capability declarations. The host app decides whether to
 include the AME prompt section.
 
 ### Malicious AME Output
 
 An LLM (or a compromised agent) could generate AME documents containing
-malicious action arguments — for example, `tool(delete_all_data)` or
+malicious action arguments: for example, `tool(delete_all_data)` or
 `uri("javascript:alert(1)")`. The AME spec addresses this through two
 mechanisms:
 

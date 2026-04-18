@@ -15,6 +15,18 @@ public final class AmeParser {
     private var _warnings: [String] = []
     private var _errors: [String] = []
 
+    // Streaming-mode data section state (Bug 8). When parseLine() is the only
+    // ingest API in use, calling parseLine("---") flips streamingDataMode on,
+    // and subsequent parseLine() calls accumulate into streamingDataBuffer
+    // until getResolvedTree() finalizes by parsing the buffer through
+    // parseDataSection. streamingDataApplied guards idempotence so repeated
+    // getResolvedTree() calls do not re-parse the buffer. The batch parse(_:)
+    // entry path manages its own dataLines accumulator and never trips this
+    // state machine.
+    private var streamingDataMode: Bool = false
+    private var streamingDataBuffer: String = ""
+    private var streamingDataApplied: Bool = false
+
     public var warnings: [String] { _warnings }
     public var errors: [String] { _errors }
 
@@ -60,7 +72,35 @@ public final class AmeParser {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty { return nil }
         if trimmed.hasPrefix("//") { return nil }
-        if trimmed == AmeKeywords.dataSeparator { return nil }
+        if trimmed == AmeKeywords.dataSeparator {
+            // Bug 8: flip streaming-mode data accumulator on. Subsequent
+            // parseLine() calls feed streamingDataBuffer until the next
+            // reset(). Mirrors the batch parse() warning when the separator
+            // is seen twice on the same parser lifetime.
+            if streamingDataMode {
+                _warnings.append("Multiple --- separators found; ignoring subsequent ones")
+            } else {
+                streamingDataMode = true
+                streamingDataApplied = false
+            }
+            return nil
+        }
+        if streamingDataMode {
+            // Disambiguate JSON content from AME identifier definitions in
+            // streaming mode. AME identifiers are required to start with a
+            // letter (see the identifier-shape check below), so a
+            // letter-prefixed line is AME and anything else (`{`, `}`, `[`,
+            // `]`, `"`, digit, sign, whitespace) accumulates into the JSON
+            // buffer. This lets streaming consumers emit either order:
+            // AME-then-`---`-then-JSON (mirrors batch parse()), or
+            // `---`-then-JSON-then-AME (the audit test's contract).
+            if let firstChar = trimmed.first, !firstChar.isLetter {
+                streamingDataBuffer.append(line)
+                streamingDataBuffer.append("\n")
+                return nil
+            }
+            // Falls through to AME identifier handling below.
+        }
 
         guard let equalsIndex = trimmed.firstIndex(of: "=") else {
             _errors.append("Malformed line (no '='): \(trimmed)")
@@ -74,6 +114,16 @@ public final class AmeParser {
             _errors.append("Invalid identifier '\(identifier)' on line: \(trimmed)")
             return nil
         }
+
+        // Bug 9 (v1.2 resolution): syntax.md previously listed every enum
+        // value token (TxtStyle, BtnStyle, BadgeVariant, InputType, ChartType,
+        // CalloutType, TimelineStatus, SemanticColor, plus Align) as reserved.
+        // Path D of WP#3 retracts that over-aggressive rule because the parser
+        // already disambiguates by argument position: `title` on the LHS of
+        // `=` is always a registry key, while `title` as a positional argument
+        // to `txt(...)` is always evaluated against the TxtStyle enum first.
+        // Common identifiers like `title`, `label`, `body`, `text`, `default`
+        // are now legal as user-defined identifiers without restriction.
 
         if registry.keys.contains(identifier) {
             _warnings.append("Duplicate identifier '\(identifier)' — replacing previous definition")
@@ -94,9 +144,21 @@ public final class AmeParser {
         dataModel = nil
         _warnings.removeAll()
         _errors.removeAll()
+        streamingDataMode = false
+        streamingDataBuffer = ""
+        streamingDataApplied = false
     }
 
     public func getResolvedTree() -> AmeNode? {
+        // Bug 8: finalize the streaming data buffer (if any) before resolving.
+        // Guarded by `dataModel == nil` so a prior batch parse() that already
+        // populated dataModel takes precedence (mixed-mode safety, per the
+        // streaming.md contract). Guarded by `!streamingDataApplied` so
+        // repeated getResolvedTree() calls are idempotent.
+        if !streamingDataBuffer.isEmpty && dataModel == nil && !streamingDataApplied {
+            parseDataSection(streamingDataBuffer)
+            streamingDataApplied = true
+        }
         guard let root = registry["root"] else { return nil }
         return resolveTree(root)
     }
@@ -460,10 +522,25 @@ public final class AmeParser {
 
         var series: [[Double]]? = nil
         var seriesPath: String? = nil
+        var seriesPaths: [String]? = nil
         if let seriesArg = named["series"] {
             switch seriesArg {
             case .dataRef(let path): seriesPath = path
-            case .arr: series = resolveNestedDoubleListArg(seriesArg)
+            case .arr(let items):
+                // Disambiguate: if every element parses to a $path reference,
+                // treat as array-of-paths (Bug 7); otherwise fall back to the
+                // existing literal nested-numeric-array handling.
+                let parsedItems = items.map { parseArgValue($0.trimmingCharacters(in: .whitespaces)) }
+                let allDataRefs = !parsedItems.isEmpty && parsedItems.allSatisfy { item in
+                    if case .dataRef = item { return true } else { return false }
+                }
+                if allDataRefs {
+                    seriesPaths = parsedItems.compactMap { item in
+                        if case .dataRef(let path) = item { return path } else { return nil }
+                    }
+                } else {
+                    series = resolveNestedDoubleListArg(seriesArg)
+                }
             default: break
             }
         }
@@ -473,7 +550,8 @@ public final class AmeParser {
 
         return .chart(type: type, values: values, labels: labels, series: series,
                       height: height, color: color,
-                      valuesPath: valuesPath, labelsPath: labelsPath, seriesPath: seriesPath)
+                      valuesPath: valuesPath, labelsPath: labelsPath,
+                      seriesPath: seriesPath, seriesPaths: seriesPaths)
     }
 
     private func buildCode(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
@@ -500,7 +578,8 @@ public final class AmeParser {
         let type = pos.first.flatMap { resolveCalloutTypeArg($0) } ?? .info
         let content = resolveStringArg(pos.safeGet(1))
         let title = pos.safeGet(2).flatMap { resolveStringArgNullable($0) }
-        return .callout(type: type, content: content, title: title)
+        let color: SemanticColor? = named["color"].flatMap { resolveSemanticColorArg($0) }
+        return .callout(type: type, content: content, title: title, color: color)
     }
 
     private func buildTimeline(_ pos: [ParsedValue], _ named: [String: ParsedValue]) -> AmeNode {
@@ -849,20 +928,29 @@ public final class AmeParser {
         let trimmed = input.trimmingCharacters(in: .whitespaces)
         guard trimmed.hasPrefix("[") else { return [] }
 
+        // Find matching `]` respecting string literals so a `]` inside `"..."`
+        // does not prematurely close the array (Bug 3b).
         var depth = 0
         var endIdx: String.Index?
+        var inString = false
+        var escaped = false
         for i in trimmed.indices {
-            switch trimmed[i] {
-            case "[": depth += 1
-            case "]":
+            let c = trimmed[i]
+            if escaped { escaped = false; continue }
+            if inString {
+                if c == "\\" { escaped = true }
+                else if c == "\"" { inString = false }
+                continue
+            }
+            if c == "\"" { inString = true; continue }
+            if c == "[" { depth += 1; continue }
+            if c == "]" {
                 depth -= 1
                 if depth == 0 {
                     endIdx = i
                     break
                 }
-            default: break
             }
-            if endIdx != nil { break }
         }
 
         let content: String
@@ -1010,24 +1098,40 @@ public final class AmeParser {
     }
 
     /// Extracts the content between matching parentheses starting at openIndex (character offset).
+    /// Respects string literals so a `)` inside `"..."` does not prematurely
+    /// close the parenthesized region (Bug 3a).
     private func extractParenContent(_ input: String, openIndex: Int) -> String {
         let startIdx = input.index(input.startIndex, offsetBy: openIndex)
         var depth = 0
         var closeIdx: String.Index?
+        var inString = false
+        var escaped = false
 
         var i = startIdx
         while i < input.endIndex {
-            switch input[i] {
-            case "(": depth += 1
-            case ")":
+            let c = input[i]
+            if escaped {
+                escaped = false
+                i = input.index(after: i)
+                continue
+            }
+            if inString {
+                if c == "\\" { escaped = true }
+                else if c == "\"" { inString = false }
+                i = input.index(after: i)
+                continue
+            }
+            if c == "\"" {
+                inString = true
+            } else if c == "(" {
+                depth += 1
+            } else if c == ")" {
                 depth -= 1
                 if depth == 0 {
                     closeIdx = i
                     break
                 }
-            default: break
             }
-            if closeIdx != nil { break }
             i = input.index(after: i)
         }
 
@@ -1068,30 +1172,43 @@ public final class AmeParser {
 
     // MARK: - Tree Resolution (Forward Refs, $path, each() expansion)
 
-    private func resolveTree(_ node: AmeNode, scope: [String: Any]? = nil) -> AmeNode {
+    /// Resolves Ref nodes against the registry and `$path` data references
+    /// against `scope`. The `visited` set carries the chain of ref ids that
+    /// are currently being dereferenced down a single branch of the tree;
+    /// when a Ref's id appears in `visited` we treat it as a cycle and leave
+    /// the node unresolved (Bug 11). The set is immutable per call so sibling
+    /// branches and diamond-ref patterns (`a -> c, b -> c`) resolve
+    /// independently rather than poisoning each other.
+    private func resolveTree(_ node: AmeNode, scope: [String: Any]? = nil, visited: Set<String> = []) -> AmeNode {
         let effectiveScope = scope ?? dataModel
         switch node {
         case .col(let children, let align):
-            return .col(children: resolveChildren(children, scope: effectiveScope), align: align)
+            return .col(children: resolveChildren(children, scope: effectiveScope, visited: visited), align: align)
         case .row(let children, let align, let gap):
-            return .row(children: resolveChildren(children, scope: effectiveScope), align: align, gap: gap)
+            return .row(children: resolveChildren(children, scope: effectiveScope, visited: visited), align: align, gap: gap)
         case .card(let children, let elevation):
-            return .card(children: resolveChildren(children, scope: effectiveScope), elevation: elevation)
+            return .card(children: resolveChildren(children, scope: effectiveScope, visited: visited), elevation: elevation)
         case .dataList(let children, let dividers):
-            return .dataList(children: resolveChildren(children, scope: effectiveScope), dividers: dividers)
+            return .dataList(children: resolveChildren(children, scope: effectiveScope, visited: visited), dividers: dividers)
         case .accordion(let title, let children, let expanded):
             let resolvedTitle = effectiveScope.map { resolvePathInScope(title, scope: $0) } ?? title
-            return .accordion(title: resolvedTitle, children: resolveChildren(children, scope: effectiveScope), expanded: expanded)
+            return .accordion(title: resolvedTitle, children: resolveChildren(children, scope: effectiveScope, visited: visited), expanded: expanded)
         case .carousel(let children, let peek):
-            return .carousel(children: resolveChildren(children, scope: effectiveScope), peek: peek)
+            return .carousel(children: resolveChildren(children, scope: effectiveScope, visited: visited), peek: peek)
         case .timeline(let children):
-            return .timeline(children: resolveChildren(children, scope: effectiveScope))
+            return .timeline(children: resolveChildren(children, scope: effectiveScope, visited: visited))
         case .ref(let id):
-            if let resolved = registry[id] { return resolveTree(resolved, scope: effectiveScope) }
+            if visited.contains(id) {
+                _warnings.append("Ref cycle detected at '\(id)'; leaving unresolved")
+                return node
+            }
+            if let resolved = registry[id] {
+                return resolveTree(resolved, scope: effectiveScope, visited: visited.union([id]))
+            }
             return node
         case .each:
             guard let s = effectiveScope else { return node }
-            let expanded = expandEach(node, parentScope: s)
+            let expanded = expandEach(node, parentScope: s, visited: visited)
             if expanded.count == 1 { return expanded[0] }
             return .col(children: expanded)
         case .txt(let text, let style, let maxLines, let color):
@@ -1112,10 +1229,11 @@ public final class AmeParser {
         case .icon(let name, let size):
             guard let s = effectiveScope else { return node }
             return .icon(name: resolvePathInScope(name, scope: s), size: size)
-        case .callout(let calloutType, let content, let title):
+        case .callout(let calloutType, let content, let title, let color):
             guard let s = effectiveScope else { return node }
             return .callout(type: calloutType, content: resolvePathInScope(content, scope: s),
-                            title: title.map { resolvePathInScope($0, scope: s) })
+                            title: title.map { resolvePathInScope($0, scope: s) },
+                            color: color)
         case .code(let language, let content, let title):
             guard let s = effectiveScope else { return node }
             return .code(language: language, content: resolvePathInScope(content, scope: s),
@@ -1131,19 +1249,25 @@ public final class AmeParser {
         }
     }
 
-    private func resolveChildren(_ children: [AmeNode], scope: [String: Any]?) -> [AmeNode] {
+    private func resolveChildren(_ children: [AmeNode], scope: [String: Any]?, visited: Set<String> = []) -> [AmeNode] {
         children.map { child in
             switch child {
             case .ref(let id):
-                if let resolved = registry[id] { return resolveTree(resolved, scope: scope) }
+                if visited.contains(id) {
+                    _warnings.append("Ref cycle detected at '\(id)'; leaving unresolved")
+                    return child
+                }
+                if let resolved = registry[id] {
+                    return resolveTree(resolved, scope: scope, visited: visited.union([id]))
+                }
                 return child
             default:
-                return resolveTree(child, scope: scope)
+                return resolveTree(child, scope: scope, visited: visited)
             }
         }
     }
 
-    private func expandEach(_ node: AmeNode, parentScope: [String: Any]) -> [AmeNode] {
+    private func expandEach(_ node: AmeNode, parentScope: [String: Any], visited: Set<String> = []) -> [AmeNode] {
         guard case .each(let dataPath, let templateId) = node else { return [] }
         guard let array = resolveDataArray(dataPath, scope: parentScope) else { return [] }
         if array.isEmpty { return [] }
@@ -1158,7 +1282,7 @@ public final class AmeParser {
                 _warnings.append("each() array element is not a JSON object")
                 return nil
             }
-            return resolveTree(template, scope: dict)
+            return resolveTree(template, scope: dict, visited: visited)
         }
     }
 
@@ -1201,18 +1325,35 @@ public final class AmeParser {
 
     private func resolveChartPaths(_ node: AmeNode, scope: [String: Any]?) -> AmeNode {
         guard case .chart(let type, let values, let labels, let series,
-                          let height, let color, let valuesPath, let labelsPath, let seriesPath) = node else {
+                          let height, let color, let valuesPath, let labelsPath,
+                          let seriesPath, let seriesPaths) = node else {
             return node
         }
         guard let s = scope else { return node }
 
         let resolvedValues = values ?? valuesPath.flatMap { resolveDoubleArrayFromData($0, scope: s) }
         let resolvedLabels = labels ?? labelsPath.flatMap { resolveStringArrayFromData($0, scope: s) }
-        let resolvedSeries = series ?? seriesPath.flatMap { resolveNestedDoubleArrayFromData($0, scope: s) }
+
+        // Series resolution chain: literal `series` > single `seriesPath` > array `seriesPaths`.
+        // For seriesPaths, resolution is all-or-nothing (every path must resolve)
+        // so partial multi-series charts never reach the renderer. Mismatched
+        // array LENGTHS within successfully-resolved paths are preserved verbatim
+        // (matches existing literal-series behavior).
+        let resolvedSeries: [[Double]]?
+        if let series {
+            resolvedSeries = series
+        } else if let seriesPath, let s2d = resolveNestedDoubleArrayFromData(seriesPath, scope: s) {
+            resolvedSeries = s2d
+        } else if let seriesPaths {
+            let resolved = seriesPaths.compactMap { resolveDoubleArrayFromData($0, scope: s) }
+            resolvedSeries = (resolved.count == seriesPaths.count) ? resolved : nil
+        } else {
+            resolvedSeries = nil
+        }
 
         return .chart(type: type, values: resolvedValues, labels: resolvedLabels, series: resolvedSeries,
                       height: height, color: color,
-                      valuesPath: nil, labelsPath: nil, seriesPath: nil)
+                      valuesPath: nil, labelsPath: nil, seriesPath: nil, seriesPaths: nil)
     }
 
     private func resolveDoubleArrayFromData(_ path: String, scope: [String: Any]) -> [Double]? {

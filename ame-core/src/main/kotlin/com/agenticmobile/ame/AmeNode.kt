@@ -184,9 +184,17 @@ sealed interface AmeNode {
      * [values] is the primary data series. [series] overrides [values] for
      * multi-series charts. Both accept $path references to data model arrays.
      *
-     * [valuesPath], [labelsPath], [seriesPath] store unresolved $path references
-     * when data binding is deferred. After resolveTree, these are null and
-     * the resolved data populates [values], [labels], [series].
+     * [valuesPath], [labelsPath], [seriesPath], [seriesPaths] store unresolved
+     * $path references when data binding is deferred. After resolveTree, these
+     * are null and the resolved data populates [values], [labels], [series].
+     *
+     * [seriesPath] holds a single $path that resolves to a 2D array
+     * (the multi-series matrix lives at one location in the data model).
+     * [seriesPaths] holds an array of $path references where each path
+     * resolves to a 1D array (one series per path). This corresponds to the
+     * spec syntax `series=[$a, $b]`. Resolution is all-or-nothing: if any
+     * path fails to resolve, [series] stays null so the renderer shows the
+     * empty state rather than a misleading partial chart.
      */
     @Serializable
     @SerialName("chart")
@@ -199,7 +207,8 @@ sealed interface AmeNode {
         val color: SemanticColor? = null,
         val valuesPath: String? = null,
         val labelsPath: String? = null,
-        val seriesPath: String? = null
+        val seriesPath: String? = null,
+        val seriesPaths: List<String>? = null
     ) : AmeNode
 
     // ── Rich Content Primitives ───────────────────────────────────────
@@ -243,13 +252,15 @@ sealed interface AmeNode {
     /**
      * Visually distinct alert/info box with type-specific icon and tint.
      * [type] determines the icon, background color, and semantic meaning.
+     * [color] optionally overrides the type-derived tint with a SemanticColor.
      */
     @Serializable
     @SerialName("callout")
     data class Callout(
         val type: CalloutType,
         val content: String,
-        val title: String? = null
+        val title: String? = null,
+        val color: SemanticColor? = null
     ) : AmeNode
 
     // ── Sequence Primitives ───────────────────────────────────────────

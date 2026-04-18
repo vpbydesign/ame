@@ -47,7 +47,7 @@ number in this document is a measured integer from the Gemini tokenizer.
 The A2UI strings use the v0.9 format as documented at
 [a2ui.org/reference/components/](https://a2ui.org/reference/components/),
 including the `updateComponents` wrapper with `surfaceId` and flat `components`
-array — this is what a real A2UI agent generates.
+array. This is what a real A2UI agent generates.
 
 **Component parity gaps:** A2UI v0.9 does not have direct equivalents for
 AME's `badge`, `progress`, or `spacer` primitives. Where AME uses `badge()`,
@@ -67,10 +67,10 @@ A2UI strings to ensure equivalent functionality is being compared.
 ### Raw JSON Format Notes
 
 The raw JSON format uses naive nested objects with `type`, `children`, `text`,
-`style`, and `action` fields. This is a baseline representation — not a
-competing specification — included to show where each format's overhead comes
-from. Raw JSON lacks identifiers, streaming support, forward references, and
-any specification structure.
+`style`, and `action` fields. This is a baseline representation, not a
+competing specification. It is included to show where each format's overhead
+comes from. Raw JSON lacks identifiers, streaming support, forward references,
+and any specification structure.
 
 ### Reproducibility
 
@@ -111,7 +111,7 @@ of cross-tokenizer benchmarks are welcome.
 AME is 1.77x more compact than A2UI on average across all 8 scenarios. The
 v1.1 primitives show an even stronger advantage (2.07x) because A2UI v0.9
 has no native chart, callout, timeline, code, accordion, or carousel
-components — developers must compose these from raw `Text`, `Row`, `Column`,
+components, so developers must compose these from raw `Text`, `Row`, `Column`,
 `Card`, and `Icon` primitives, multiplying structural overhead.
 
 The efficiency gain varies by UI complexity:
@@ -164,7 +164,7 @@ The efficiency gain varies by UI complexity:
 **AME vs Raw JSON (the baseline comparison):**
 
 Raw nested JSON is 1.15x more compact than AME on average. This is expected
-and by design — AME pays a ~15% token overhead for capabilities that raw JSON
+and by design. AME pays a ~15% token overhead for capabilities that raw JSON
 lacks:
 
 - **Identifiers** — every AME line has `identifier = ...`, consuming tokens

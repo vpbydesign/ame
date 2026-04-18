@@ -8,9 +8,13 @@ let package = Package(
         .library(name: "AMESwiftUI", targets: ["AMESwiftUI"]),
         .executable(name: "ame-conformance-swift", targets: ["AMEConformanceCli"])
     ],
+    dependencies: [],
     targets: [
         .target(name: "AMESwiftUI"),
         .executableTarget(name: "AMEConformanceCli", dependencies: ["AMESwiftUI"]),
-        .testTarget(name: "AMESwiftUITests", dependencies: ["AMESwiftUI"])
+        .testTarget(
+            name: "AMESwiftUITests",
+            dependencies: ["AMESwiftUI"]
+        )
     ]
 )

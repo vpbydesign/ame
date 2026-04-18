@@ -16,6 +16,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     testImplementation(kotlin("test"))
+    testImplementation(kotlin("reflect"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 }
 

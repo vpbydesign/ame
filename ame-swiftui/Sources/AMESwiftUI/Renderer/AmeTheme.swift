@@ -26,6 +26,10 @@ public struct AmeTheme {
     // MARK: - Badge Color Mapping
 
     /// Maps BadgeVariant enum values to background Color objects.
+    ///
+    /// Bug #14 (WP#5, Path D): semantic system colors (`Color(.systemGreen)`
+    /// etc.) automatically adapt to the user's appearance setting per
+    /// Apple HIG, with no `@Environment(\.colorScheme)` plumbing required.
     public static func badgeColor(_ variant: BadgeVariant) -> Color {
         switch variant {
         #if os(iOS)
@@ -33,23 +37,24 @@ public struct AmeTheme {
         #else
         case .default: return Color.gray.opacity(0.15)
         #endif
-        case .success: return Color.green.opacity(0.2)
-        case .warning: return Color.orange.opacity(0.2)
-        case .error:   return Color.red.opacity(0.2)
-        case .info:    return Color.blue.opacity(0.2)
+        case .success: return Color(.systemGreen).opacity(0.2)
+        case .warning: return Color(.systemOrange).opacity(0.2)
+        case .error:   return Color(.systemRed).opacity(0.2)
+        case .info:    return Color(.systemBlue).opacity(0.2)
         }
     }
 
     // MARK: - Badge Text Color Mapping
 
     /// Maps BadgeVariant to a foreground text color for contrast.
+    /// Bug #14 (WP#5, Path D): adaptive system colors.
     public static func badgeTextColor(_ variant: BadgeVariant) -> Color {
         switch variant {
         case .default: return .primary
-        case .success: return Color.green
-        case .warning: return Color.orange
-        case .error:   return Color.red
-        case .info:    return Color.blue
+        case .success: return Color(.systemGreen)
+        case .warning: return Color(.systemOrange)
+        case .error:   return Color(.systemRed)
+        case .info:    return Color(.systemBlue)
         }
     }
 
@@ -67,13 +72,14 @@ public struct AmeTheme {
     }
 
     /// Maps CalloutType to a foreground tint color.
+    /// Bug #14 (WP#5, Path D): adaptive system colors.
     public static func calloutTint(_ type: CalloutType) -> Color {
         switch type {
-        case .info:    return .blue
-        case .warning: return .orange
-        case .error:   return .red
-        case .success: return .green
-        case .tip:     return .purple
+        case .info:    return Color(.systemBlue)
+        case .warning: return Color(.systemOrange)
+        case .error:   return Color(.systemRed)
+        case .success: return Color(.systemGreen)
+        case .tip:     return Color(.systemPurple)
         }
     }
 
@@ -85,6 +91,7 @@ public struct AmeTheme {
     // MARK: - Timeline Style Mapping
 
     /// Maps TimelineStatus to a circle fill color.
+    /// Bug #14 (WP#5, Path D): error state uses adaptive systemRed.
     public static func timelineCircleColor(_ status: TimelineStatus) -> Color {
         switch status {
         case .done:    return .accentColor
@@ -94,11 +101,12 @@ public struct AmeTheme {
         #else
         case .pending: return Color.gray.opacity(0.4)
         #endif
-        case .error:   return .red
+        case .error:   return Color(.systemRed)
         }
     }
 
     /// Maps TimelineStatus to a connector line color.
+    /// Bug #14 (WP#5, Path D): error state uses adaptive systemRed.
     public static func timelineLineColor(_ status: TimelineStatus) -> Color {
         switch status {
         case .done:    return .accentColor
@@ -109,7 +117,7 @@ public struct AmeTheme {
         case .active:  return Color.gray.opacity(0.4)
         case .pending: return Color.gray.opacity(0.4)
         #endif
-        case .error:   return .red
+        case .error:   return Color(.systemRed)
         }
     }
 
@@ -126,13 +134,20 @@ public struct AmeTheme {
     // MARK: - Semantic Color Mapping
 
     /// Maps SemanticColor to a platform-appropriate SwiftUI color.
+    ///
+    /// Bug #14 (WP#5, Path D): adaptive system semantic colors. Apple's
+    /// `Color(.systemGreen)` etc. automatically resolve to mode-appropriate
+    /// values per HIG, with no `@Environment(\.colorScheme)` plumbing
+    /// required. SUCCESS stays recognizably green and WARNING stays
+    /// recognizably orange across light and dark mode, preserving the
+    /// semantic vocabulary AME callouts depend on.
     public static func semanticColor(_ color: SemanticColor) -> Color {
         switch color {
         case .primary:   return .accentColor
         case .secondary: return .secondary
-        case .error:     return .red
-        case .success:   return .green
-        case .warning:   return .orange
+        case .error:     return Color(.systemRed)
+        case .success:   return Color(.systemGreen)
+        case .warning:   return Color(.systemOrange)
         }
     }
 }

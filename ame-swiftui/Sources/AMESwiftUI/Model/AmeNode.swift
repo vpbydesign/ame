@@ -81,12 +81,20 @@ public indirect enum AmeNode: Equatable, Sendable {
     // MARK: Visualization Primitives
 
     /// Data visualization chart. Supports line, bar, pie, and sparkline types.
-    /// `valuesPath`, `labelsPath`, and `seriesPath` store unresolved $path
-    /// references. After parse-time resolution against the data model, these
+    /// `valuesPath`, `labelsPath`, `seriesPath`, and `seriesPaths` store unresolved
+    /// $path references. After parse-time resolution against the data model, these
     /// are cleared to nil and `values`/`labels`/`series` are populated.
+    ///
+    /// `seriesPath` holds a single $path that resolves to a 2D array (the multi-series
+    /// matrix lives at one location in the data model). `seriesPaths` holds an array
+    /// of $path references where each path resolves to a 1D array (one series per
+    /// path). Corresponds to the spec syntax `series=[$a, $b]`. Resolution is
+    /// all-or-nothing: if any path fails to resolve, `series` stays nil so the
+    /// renderer shows the empty state rather than a misleading partial chart.
     case chart(type: ChartType, values: [Double]? = nil, labels: [String]? = nil,
                series: [[Double]]? = nil, height: Int = 200, color: SemanticColor? = nil,
-               valuesPath: String? = nil, labelsPath: String? = nil, seriesPath: String? = nil)
+               valuesPath: String? = nil, labelsPath: String? = nil, seriesPath: String? = nil,
+               seriesPaths: [String]? = nil)
 
     // MARK: Rich Content Primitives
 
@@ -104,7 +112,8 @@ public indirect enum AmeNode: Equatable, Sendable {
     // MARK: Alert Primitives
 
     /// Visually distinct alert/info box with type-specific icon and tint.
-    case callout(type: CalloutType, content: String, title: String? = nil)
+    /// `color` optionally overrides the type-derived tint with a SemanticColor.
+    case callout(type: CalloutType, content: String, title: String? = nil, color: SemanticColor? = nil)
 
     // MARK: Sequence Primitives
 
@@ -166,6 +175,7 @@ extension AmeNode: Codable {
         case valuesPath
         case labelsPath
         case seriesPath
+        case seriesPaths
         case language
         case content
         case title
@@ -234,7 +244,10 @@ extension AmeNode: Codable {
 
         case .progress(let value, let label):
             try container.encode("progress", forKey: .type)
-            try container.encode(value, forKey: .value)
+            // Wrap in PreservedFloat so whole-number values (e.g. 1.0)
+            // round-trip with the canonical Kotlin `1.0` form, not Foundation's
+            // truncated `1` (Bug 21). AmeSerializer.toJson strips the sentinels.
+            try container.encode(PreservedFloat(value), forKey: .value)
             if let label { try container.encode(label, forKey: .label) }
 
         case .btn(let label, let action, let style, let icon):
@@ -268,17 +281,22 @@ extension AmeNode: Codable {
             try container.encode(rows, forKey: .rows)
 
         case .chart(let chartType, let values, let labels, let series, let height, let color,
-                    let valuesPath, let labelsPath, let seriesPath):
+                    let valuesPath, let labelsPath, let seriesPath, let seriesPaths):
             try container.encode("chart", forKey: .type)
             try container.encode(chartType, forKey: .inputType)
-            if let values { try container.encode(values, forKey: .values) }
+            // Wrap Double-typed arrays in PreservedDouble so whole-number
+            // values (e.g. [1, 2, 3]) round-trip with the canonical Kotlin
+            // `[1.0,2.0,3.0]` form, not Foundation's truncated `[1,2,3]`
+            // (Bug 21). AmeSerializer.toJson strips the sentinels.
+            if let values { try container.encode(values.map { PreservedDouble($0) }, forKey: .values) }
             if let labels { try container.encode(labels, forKey: .labels) }
-            if let series { try container.encode(series, forKey: .series) }
+            if let series { try container.encode(series.map { $0.map { PreservedDouble($0) } }, forKey: .series) }
             if height != 200 { try container.encode(height, forKey: .height) }
             if let color { try container.encode(color, forKey: .color) }
             if let valuesPath { try container.encode(valuesPath, forKey: .valuesPath) }
             if let labelsPath { try container.encode(labelsPath, forKey: .labelsPath) }
             if let seriesPath { try container.encode(seriesPath, forKey: .seriesPath) }
+            if let seriesPaths { try container.encode(seriesPaths, forKey: .seriesPaths) }
 
         case .code(let language, let codeContent, let codeTitle):
             try container.encode("code", forKey: .type)
@@ -297,11 +315,12 @@ extension AmeNode: Codable {
             if !children.isEmpty { try container.encode(children, forKey: .children) }
             if peek != 24 { try container.encode(peek, forKey: .peek) }
 
-        case .callout(let calloutType, let calloutContent, let calloutTitle):
+        case .callout(let calloutType, let calloutContent, let calloutTitle, let calloutColor):
             try container.encode("callout", forKey: .type)
             try container.encode(calloutType, forKey: .inputType)
             try container.encode(calloutContent, forKey: .content)
             if let calloutTitle { try container.encode(calloutTitle, forKey: .title) }
+            if let calloutColor { try container.encode(calloutColor, forKey: .color) }
 
         case .timeline(let children):
             try container.encode("timeline", forKey: .type)
@@ -420,9 +439,11 @@ extension AmeNode: Codable {
             let valuesPath = try container.decodeIfPresent(String.self, forKey: .valuesPath)
             let labelsPath = try container.decodeIfPresent(String.self, forKey: .labelsPath)
             let seriesPath = try container.decodeIfPresent(String.self, forKey: .seriesPath)
+            let seriesPaths = try container.decodeIfPresent([String].self, forKey: .seriesPaths)
             self = .chart(type: chartType, values: values, labels: labels, series: series,
                           height: height, color: color,
-                          valuesPath: valuesPath, labelsPath: labelsPath, seriesPath: seriesPath)
+                          valuesPath: valuesPath, labelsPath: labelsPath,
+                          seriesPath: seriesPath, seriesPaths: seriesPaths)
 
         case "code":
             let language = try container.decode(String.self, forKey: .language)
@@ -445,7 +466,8 @@ extension AmeNode: Codable {
             let calloutType = try container.decode(CalloutType.self, forKey: .inputType)
             let calloutContent = try container.decode(String.self, forKey: .content)
             let calloutTitle = try container.decodeIfPresent(String.self, forKey: .title)
-            self = .callout(type: calloutType, content: calloutContent, title: calloutTitle)
+            let calloutColor = try container.decodeIfPresent(SemanticColor.self, forKey: .color)
+            self = .callout(type: calloutType, content: calloutContent, title: calloutTitle, color: calloutColor)
 
         case "timeline":
             let children = try container.decodeIfPresent([AmeNode].self, forKey: .children) ?? []

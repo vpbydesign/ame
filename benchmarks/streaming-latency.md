@@ -8,7 +8,7 @@ progressive rendering on mobile devices.
 
 ## Methodology
 
-This is a **simulated benchmark** — it models when content becomes renderable based
+This is a **simulated benchmark**. It models when content becomes renderable based
 on LLM token generation rates, not a live device test. The simulation uses measured
 token counts from the [token comparison benchmark](token-comparison.md) and the
 streaming timeline from the [streaming specification](../specification/v1.0/streaming.md).
@@ -109,7 +109,7 @@ technically possible but requires a non-standard, stateful parser that tracks
 JSON nesting depth and reconstructs objects incrementally.
 
 A2UI's flat array structure (each component has a `parentId` reference) means
-components can be rendered independently once extracted — but the parent layout
+components can be rendered independently once extracted, but the parent layout
 must already exist for a child to be placed. The first complete component
 object arrives after the JSON preamble (`{"updateComponents":{"components":[{`)
 plus all key-value pairs for that component.
@@ -183,7 +183,7 @@ experience:
 
 ### Why the Gap Is Structural
 
-The advantage is not just about token count — it is architectural:
+The advantage is not just about token count. It is architectural:
 
 1. **Line independence:** Each AME statement is self-contained and parseable in
    isolation. The parser processes `txt("Luigi's", title)` the instant the line
@@ -201,7 +201,7 @@ The advantage is not just about token count — it is architectural:
 
 ### Token Efficiency Compounds the Advantage
 
-AME generates fewer tokens for the same UI (581 vs 1,014 — a 1.75x reduction for
+AME generates fewer tokens for the same UI (581 vs 1,014, a 1.75x reduction for
 this scenario). This means:
 - The total generation time is shorter (5.81s vs 10.14s)
 - The cost per response is lower (42.7% fewer tokens)

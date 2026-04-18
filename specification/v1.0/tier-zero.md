@@ -3,7 +3,7 @@
 ## Introduction
 
 Tier 0 is AME's zero-token UI rendering mode. When a tool executes and returns
-structured data, the host app generates an `AmeNode` tree locally — without
+structured data, the host app generates an `AmeNode` tree locally, without
 any LLM involvement in UI decisions. The LLM calls a tool, the tool returns
 data, the app builds UI from that data, and the renderer displays it. Zero
 extra tokens are consumed for UI generation.
@@ -33,7 +33,7 @@ interpreted as described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
 ## The Three Tiers of AME Rendering
 
 AME supports three tiers of UI generation, ranging from zero LLM involvement
-to full LLM-generated layouts. The tiers are not mutually exclusive — a single
+to full LLM-generated layouts. The tiers are not mutually exclusive; a single
 conversation may use all three depending on context.
 
 | Tier | How UI Is Created | Token Cost | Latency Impact | Use Case |
@@ -95,7 +95,7 @@ reserved for the uncommon cases that genuinely need custom layouts.
 ## Tier 1: Layout Hints
 
 Tier 1 extends Tier 0 by allowing the LLM to influence which template the
-shape matcher selects — without generating any AME syntax. The mechanism is
+shape matcher selects, without generating any AME syntax. The mechanism is
 a single keyword string, called a **layout hint**, that accompanies the tool
 result. The host app's shape matcher reads the hint and selects an alternate
 builder function for the same data shape.
@@ -103,7 +103,7 @@ builder function for the same data shape.
 ### How Layout Hints Work
 
 In Tier 0, the shape matcher inspects the tool result data and always produces
-the same `AmeNode` tree for a given data shape — for example, place results
+the same `AmeNode` tree for a given data shape. For example, place results
 always render as a vertical list of cards. In Tier 1, the shape matcher also
 receives a layout hint keyword and MAY select a different template based on it.
 
@@ -146,7 +146,7 @@ I found 3 restaurants. Let me show you a comparison.
 ```
 
 The AME spec defines the CONCEPT of layout hints and the shape matcher
-behavior. It does NOT prescribe a specific delivery mechanism — that is
+behavior. It does NOT prescribe a specific delivery mechanism. That is
 determined by the integration layer.
 
 ### Shape Matcher with Layout Hint Support
@@ -177,7 +177,7 @@ fun matchShape(
 ```
 
 The `layout` parameter is OPTIONAL. When null, the matcher behaves exactly
-as Tier 0 — selecting the default template. This means Tier 1 is a strict
+as Tier 0, selecting the default template. This means Tier 1 is a strict
 superset of Tier 0: any Tier 0 shape matcher becomes a Tier 1 shape matcher
 by adding a `layout` parameter with default `null`.
 
@@ -204,7 +204,7 @@ are free to use these, define their own, or ignore hints entirely.
 If a shape matcher receives a layout hint it does not recognize, it MUST
 fall back to the default Tier 0 template. It SHOULD log a warning indicating
 the unrecognized hint value. It MUST NOT return null (failing to render) solely
-because of an unrecognized hint — the data is still valid and the default
+because of an unrecognized hint. The data is still valid and the default
 template still applies.
 
 ### Token Cost
@@ -212,7 +212,7 @@ template still applies.
 A layout hint is a single keyword string. In most tokenizers, this costs
 exactly **1 token**. This is the cost difference between Tier 0 (0 tokens for
 UI) and Tier 1 (1 token for UI). The tool call itself costs the same in both
-tiers — only the hint keyword is additional.
+tiers; only the hint keyword is additional.
 
 ### When to Use Tier 1 vs Tier 2
 
@@ -263,7 +263,7 @@ builder function that produces an appropriate `AmeNode` tree.
 
 ### Implementation Approach
 
-Shape matching is **app-specific code** — it is not part of the AME library.
+Shape matching is **app-specific code**; it is not part of the AME library.
 Each host app defines its own shape matchers based on the tools it supports.
 The implementation is typically a simple `when` / `if-else` chain that checks
 for known data keys:
@@ -354,8 +354,8 @@ p2_dir = btn("Directions", uri("geo:40.72,-74.00?q=Joe's Pizza"), text)
 ```
 
 **Rendered result:** A list of cards, each showing the business name (title
-style), star rating (badge), street address (caption), and two action buttons
-— "Schedule" dispatches a tool call to create a calendar event, "Directions"
+style), star rating (badge), street address (caption), and two action buttons.
+"Schedule" dispatches a tool call to create a calendar event; "Directions"
 opens a map URI.
 
 **Token cost:** Zero. The LLM called a search tool. The app built this UI
@@ -544,9 +544,9 @@ c2_mail = btn("Email", uri("mailto:alex@example.com"), text)
 ```
 
 **Rendered result:** A list of contact cards. Each shows the contact name
-(title), phone number and email (captions), and three action buttons — "Call"
-opens the phone dialer via `tel:` URI, "Message" opens SMS via `sms:` URI,
-"Email" opens the mail client via `mailto:` URI. All actions use `uri()` —
+(title), phone number and email (captions), and three action buttons. "Call"
+opens the phone dialer via `tel:` URI; "Message" opens SMS via `sms:` URI;
+"Email" opens the mail client via `mailto:` URI. All actions use `uri()`, so
 they invoke standard platform handlers without any tool calls.
 
 **Token cost:** Zero.
@@ -629,8 +629,8 @@ The fundamental insight is that most tool results have predictable data shapes.
 A restaurant search always returns places with names, ratings, and addresses.
 A calendar query always returns events with titles, dates, and times. A contact
 lookup always returns names, phone numbers, and emails. For these predictable
-shapes, generating UI descriptions from the LLM is wasteful — the app already
-knows what the UI should look like.
+shapes, generating UI descriptions from the LLM is wasteful, because the app
+already knows what the UI should look like.
 
 AME Tier 0 makes this insight explicit and systematic. Instead of paying the
 LLM to describe UI that the app could build itself, the app builds it directly
@@ -667,9 +667,8 @@ self-contained.
 ### Builder Functions
 
 Builder functions produce `AmeNode` trees using the same Kotlin sealed classes
-that the AME parser produces. There is no separate data model for Tier 0 —
-the output is the same `AmeNode` sealed interface used by the parser and
-renderer.
+that the AME parser produces. There is no separate data model for Tier 0; the
+output is the same `AmeNode` sealed interface used by the parser and renderer.
 
 ```kotlin
 object PlaceShapeBuilder {
@@ -694,7 +693,7 @@ object PlaceShapeBuilder {
 
 The `AmeRenderer` composable does not know whether the `AmeNode` tree it
 receives came from Tier 0 (shape matcher), Tier 2 (AME parser), or any
-other source. It renders all trees identically. This is by design — it means
+other source. It renders all trees identically. This is by design: it means
 Tier 0 and Tier 2 produce visually consistent results, and the renderer
 never needs to be modified to support new shapes.
 

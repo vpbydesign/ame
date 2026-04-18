@@ -556,7 +556,7 @@ final class AmeNodeTests: XCTestCase {
                                  height: 250, color: .primary)
         let json = AmeSerializer.toJson(node)!
         let decoded = AmeSerializer.fromJson(json)!
-        guard case .chart(let type, let values, let labels, _, let height, let color, _, _, _) = decoded else {
+        guard case .chart(let type, let values, let labels, _, let height, let color, _, _, _, _) = decoded else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .bar)
@@ -570,7 +570,7 @@ final class AmeNodeTests: XCTestCase {
         let node = AmeNode.chart(type: .line)
         let json = AmeSerializer.toJson(node)!
         let decoded = AmeSerializer.fromJson(json)!
-        guard case .chart(let type, let values, let labels, let series, let height, let color, _, _, _) = decoded else {
+        guard case .chart(let type, let values, let labels, let series, let height, let color, _, _, _, _) = decoded else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .line)
@@ -585,7 +585,7 @@ final class AmeNodeTests: XCTestCase {
         let node = AmeNode.chart(type: .line, series: [[1, 2], [3, 4]])
         let json = AmeSerializer.toJson(node)!
         let decoded = AmeSerializer.fromJson(json)!
-        guard case .chart(_, _, _, let series, _, _, _, _, _) = decoded else {
+        guard case .chart(_, _, _, let series, _, _, _, _, _, _) = decoded else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(series, [[1, 2], [3, 4]])
@@ -662,7 +662,7 @@ final class AmeNodeTests: XCTestCase {
         let node = AmeNode.callout(type: .warning, content: "Be careful", title: "Warning")
         let json = AmeSerializer.toJson(node)!
         let decoded = AmeSerializer.fromJson(json)!
-        guard case .callout(let type, let content, let title) = decoded else {
+        guard case .callout(let type, let content, let title, _) = decoded else {
             XCTFail("Expected callout"); return
         }
         XCTAssertEqual(type, .warning)
@@ -674,7 +674,7 @@ final class AmeNodeTests: XCTestCase {
         let node = AmeNode.callout(type: .info, content: "Note this")
         let json = AmeSerializer.toJson(node)!
         let decoded = AmeSerializer.fromJson(json)!
-        guard case .callout(let type, _, let title) = decoded else {
+        guard case .callout(let type, _, let title, _) = decoded else {
             XCTFail("Expected callout"); return
         }
         XCTAssertEqual(type, .info)
@@ -769,7 +769,7 @@ final class AmeNodeTests: XCTestCase {
         let node = AmeNode.chart(type: .sparkline, values: [1, 2, 3])
         let json = AmeSerializer.toJson(node)!
         let decoded = AmeSerializer.fromJson(json)!
-        guard case .chart(let type, let values, _, _, _, _, _, _, _) = decoded else {
+        guard case .chart(let type, let values, _, _, _, _, _, _, _, _) = decoded else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .sparkline)
@@ -780,7 +780,7 @@ final class AmeNodeTests: XCTestCase {
         let node = AmeNode.chart(type: .pie, values: [30, 40, 30], color: .success)
         let json = AmeSerializer.toJson(node)!
         let decoded = AmeSerializer.fromJson(json)!
-        guard case .chart(let type, let values, _, _, _, let color, _, _, _) = decoded else {
+        guard case .chart(let type, let values, _, _, _, let color, _, _, _, _) = decoded else {
             XCTFail("Expected chart"); return
         }
         XCTAssertEqual(type, .pie)
@@ -793,7 +793,7 @@ final class AmeNodeTests: XCTestCase {
             let node = AmeNode.callout(type: calloutType, content: "Test")
             let json = AmeSerializer.toJson(node)!
             let decoded = AmeSerializer.fromJson(json)!
-            guard case .callout(let decodedType, _, _) = decoded else {
+            guard case .callout(let decodedType, _, _, _) = decoded else {
                 XCTFail("Expected callout for type \(calloutType)"); return
             }
             XCTAssertEqual(decodedType, calloutType)

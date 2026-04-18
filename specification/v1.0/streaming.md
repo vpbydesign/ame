@@ -2,7 +2,7 @@
 
 ## Introduction
 
-AME is designed for progressive rendering — the ability to display partial UI
+AME is designed for progressive rendering: the ability to display partial UI
 immediately as tokens stream from a Large Language Model, rather than waiting
 for the complete document before rendering anything. On mobile devices, where
 perceived performance directly affects user experience, progressive rendering
@@ -52,7 +52,7 @@ very first line, updating incrementally as subsequent lines arrive.
 
 A forward reference occurs when an identifier appears in a children array
 before its defining statement has been parsed. This is the normal case during
-streaming — a layout container references children that have not yet arrived.
+streaming: a layout container references children that have not yet arrived.
 See [syntax.md](syntax.md) Rule 14 for the syntax-level definition.
 
 ### Placeholder Rendering
@@ -77,7 +77,7 @@ A skeleton placeholder:
 
 When the defining statement for a forward-referenced identifier arrives, the
 renderer MUST replace the skeleton placeholder with the actual rendered
-component. This replacement MUST be immediate — the user sees the skeleton
+component. This replacement MUST be immediate. The user sees the skeleton
 transition to real content without an explicit refresh or rebuild step.
 
 In Jetpack Compose, this is achieved by maintaining a registry of mutable
@@ -107,7 +107,7 @@ skeleton with the rendered `Text` composable.
 A renderer MAY use contextual hints to choose more appropriate skeleton shapes.
 For example, if the parent container is a `row`, child skeletons SHOULD be
 narrower and side-by-side rather than full-width stacked blocks. These hints
-are OPTIONAL optimizations — a conforming renderer MAY use uniform rectangular
+are OPTIONAL optimizations; a conforming renderer MAY use uniform rectangular
 skeletons for all unresolved references.
 
 ---
@@ -201,7 +201,7 @@ then content leaves, then data."
 ## Worked Streaming Timeline
 
 This section walks through the progressive rendering of Example 2 from
-[syntax.md](syntax.md) — the Place Search Results document (27 lines). The
+[syntax.md](syntax.md), the Place Search Results document (27 lines). The
 timeline assumes an LLM generating at 60 tokens per second. Each AME
 statement is approximately 10–20 tokens, so lines arrive roughly every
 170–330 milliseconds.
@@ -243,7 +243,7 @@ p3_dir = btn("Directions", uri("geo:40.73,-74.00?q=Carbone"), text)
 **T=0.00s** — `root = col([header, results])`
 
 The root column is created with two child slots. Both `header` and `results`
-are forward references — neither has been defined yet. The user sees a column
+are forward references; neither has been defined yet. The user sees a column
 containing two shimmer skeleton rectangles stacked vertically.
 
 **T=0.17s** — `header = txt("Italian Restaurants Nearby", headline)`
@@ -257,7 +257,7 @@ block below it for the still-unresolved `results`.
 The `results` skeleton is replaced by a `list` container with three child
 slots. `p1`, `p2`, and `p3` are all forward references. The user sees the
 headline at the top and three card-shaped skeleton placeholders arranged
-vertically below it — the page structure is now fully visible.
+vertically below it. The page structure is now fully visible.
 
 **T=0.50s** — `p1 = card([p1_top, p1_addr, p1_btns])`
 
@@ -295,7 +295,7 @@ separated by 8dp gap.
 
 The two button skeletons are replaced by "Schedule" (primary style) and
 "Directions" (text style) buttons. **The first card is now fully rendered and
-interactive** — the user can tap "Schedule" to invoke `tool(create_calendar_event)`
+interactive.** The user can tap "Schedule" to invoke `tool(create_calendar_event)`
 or "Directions" to open `uri("geo:...")`. Total time from first pixel to first
 interactive card: ~1.8 seconds.
 
@@ -337,7 +337,7 @@ empty value:
 When the `---` separator is encountered and the JSON data model is parsed,
 the renderer MUST re-resolve all `$path` references against the data model
 and update the rendered components. In Compose, this is achieved by storing
-the data model in a `MutableState` — when it updates from `null` to the
+the data model in a `MutableState`. When it updates from `null` to the
 parsed JSON object, all composables reading `$path` values recompose.
 
 ### `each()` Constructs Before Data Arrives
@@ -388,7 +388,7 @@ with a single list-shaped skeleton placeholder (120dp height).
 
 **T=0.50s** — `place_tpl = card([txt($name, title), txt($address, caption)])`
 
-The template is registered but not instantiated. No visual change — the
+The template is registered but not instantiated. No visual change occurs; the
 list skeleton remains because `each()` is still waiting for data.
 
 **T=0.67s** — `---`
@@ -398,7 +398,7 @@ The data separator is recognized. The parser switches to JSON parsing mode.
 **T=0.83s** — `{"places": [...]}`
 
 The JSON data model is parsed. `$places` resolves to a 2-element array. The
-`each()` construct instantiates `place_tpl` twice — once per array item.
+`each()` construct instantiates `place_tpl` twice, once per array item.
 Inside each instance, `$name` and `$address` resolve relative to the current
 array item. The list skeleton is replaced by two rendered cards:
 
@@ -406,6 +406,64 @@ array item. The list skeleton is replaced by two rendered cards:
 - Card 2: "Park Deli" (title) + "25 Oak Ave" (caption)
 
 The document is now fully rendered.
+
+### Streaming Data Sections
+
+Streaming consumers MAY ingest the `---` data separator and the JSON data
+that follows via repeated `parseLine()` calls (or the equivalent
+incremental API in any conforming implementation), without falling back
+to the batch `parse()` entry point.
+
+The contract is:
+
+1. Calling `parseLine("---")` flips the parser into data-ingest mode.
+2. Subsequent `parseLine()` calls in the same parser instance accumulate
+   their input into a JSON buffer when the trimmed line begins with a
+   non-letter character (`{`, `}`, `[`, `]`, `"`, a digit, a sign, or
+   whitespace). Lines whose trimmed first character is a letter remain
+   AME identifier definitions and are processed normally; they are NOT
+   buffered as JSON. This rule lets streaming consumers emit either
+   AME-then-`---`-then-JSON (mirrors the batch order) or
+   `---`-then-JSON-then-AME (any order is permitted because the
+   disambiguator runs per line).
+3. Calling `getResolvedTree()` finalizes by parsing the accumulated
+   buffer as the data model and re-resolving the registered tree
+   against it. If the buffer is empty, `getResolvedTree()` resolves
+   without a data model, matching pre-data behavior.
+4. `getResolvedTree()` is idempotent: calling it again on the same
+   parser instance does NOT re-parse the buffer, since `parseDataSection`
+   is invoked at most once per parser lifetime.
+5. `reset()` clears all parser state, including the streaming buffer
+   and the data-mode flag.
+6. JSON content MAY span multiple `parseLine()` calls. The buffer is
+   parsed once at `getResolvedTree()` time, so any whitespace introduced
+   between chunks (parsers append a newline per call) does not affect
+   the result, since standard JSON tolerates whitespace including
+   newlines between tokens.
+
+Mixing the batch `parse(input)` API and the streaming `parseLine()` API
+on the same parser instance is implementation-defined. Callers SHOULD
+use one mode per parser lifetime. If both are used, the streaming buffer
+is ignored when `dataModel` is already populated by a prior `parse()`
+call, so the batch result wins.
+
+#### Worked Example: Streaming Data Section
+
+```
+parser.parseLine("root = txt($greeting)")
+parser.parseLine("---")
+parser.parseLine("{\"greeting\":")
+parser.parseLine("    \"hello\"")
+parser.parseLine("}")
+val tree = parser.getResolvedTree()
+// tree resolves to AmeNode.Txt(text = "hello")
+```
+
+The first call registers `root`. The second flips data-ingest mode on.
+The next three calls accumulate the JSON object across three lines.
+`getResolvedTree()` parses the buffered JSON (which contains exactly
+the chunked content with newlines preserved between calls), populates
+the data model, and resolves the `$greeting` reference to `"hello"`.
 
 ---
 
@@ -431,7 +489,7 @@ A single malformed line MUST NOT invalidate the rest of the document.
 ### Permanently Unresolved References
 
 After the stream ends (the LLM finishes generating), some forward references
-may remain unresolved — either because the defining line was malformed and
+may remain unresolved, either because the defining line was malformed and
 skipped, or because the LLM omitted the definition entirely.
 
 For permanently unresolved references, the renderer:
@@ -457,7 +515,7 @@ If the JSON after `---` fails to parse:
 ## Completion
 
 An AME document is fully rendered when all forward references have been
-resolved — every identifier used in a children array has a corresponding
+resolved: every identifier used in a children array has a corresponding
 defining statement, and all `$path` references have been resolved against the
 data model.
 
@@ -489,7 +547,7 @@ MAY provide separate callbacks for structural completion and data completion.
 
 ## Non-Streaming Mode
 
-AME documents MAY be rendered without streaming — the entire document is
+AME documents MAY be rendered without streaming. The entire document is
 received as a single string and parsed at once. This is the simpler
 implementation path for host apps that do not use streaming LLM APIs, or
 for rendering cached/stored AME documents.
@@ -510,7 +568,7 @@ In non-streaming mode:
   final state directly.
 
 A conforming renderer MUST support non-streaming mode. Streaming mode support
-is RECOMMENDED but OPTIONAL — a valid renderer that only supports non-streaming
+is RECOMMENDED but OPTIONAL; a valid renderer that only supports non-streaming
 mode is conforming, provided it produces correct final output.
 
 ---
@@ -541,7 +599,7 @@ AME differs from OpenUI Lang's streaming model in the following ways:
 
 The two-phase completion model (structure then data) is AME's most significant
 streaming difference. It trades a brief "empty content" period for the
-benefit of separating structure from data — enabling Tier 0 rendering, data-only
+benefit of separating structure from data, enabling Tier 0 rendering, data-only
 updates, and template reuse. See [tier-zero.md](tier-zero.md) and
 [data-binding.md](data-binding.md).
 

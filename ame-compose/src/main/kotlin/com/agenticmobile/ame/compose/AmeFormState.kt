@@ -21,6 +21,27 @@ class AmeFormState {
     private val toggleValues = mutableMapOf<String, MutableState<Boolean>>()
 
     /**
+     * Diagnostic surface populated by [collectValues] when an input id and
+     * a toggle id collide (Bug #12). Soft-warn only: the merge order is
+     * preserved (toggle wins) so that the input/toggle contract documented
+     * in WP#4 Bug 5 stays stable; this list lets hosts detect the
+     * data-loss class instead of silently shipping bad form payloads.
+     *
+     * Cleared and recomputed on every [collectValues] call so the warnings
+     * always reflect the current registration set.
+     */
+    private val collisionWarnings = mutableListOf<String>()
+
+    /**
+     * Snapshot of collision warnings produced by the most recent
+     * [collectValues] call. Empty until [collectValues] has been called at
+     * least once. Hosts can route this to a logger, telemetry sink, or a
+     * developer-mode debug overlay.
+     */
+    val warnings: List<String>
+        get() = collisionWarnings.toList()
+
+    /**
      * Registers an input field and returns its mutable state.
      *
      * If the field was already registered (e.g., during recomposition),
@@ -48,14 +69,30 @@ class AmeFormState {
     /**
      * Collects all current form values into a flat map.
      *
+     * Merge order: inputs first, then toggles. When the same id appears in
+     * both maps the toggle value wins, matching the contract documented in
+     * WP#4 Bug 5. Bug #12 adds visibility: every collision is recorded in
+     * [warnings] so hosts can detect the silent-data-loss class without
+     * changing the merge behavior.
+     *
      * Input values are included as-is. Toggle boolean values are
      * converted to `"true"` or `"false"` strings.
      *
      * @return Map of field ID to current string value.
      */
-    fun collectValues(): Map<String, String> = buildMap {
-        inputValues.forEach { (id, state) -> put(id, state.value) }
-        toggleValues.forEach { (id, state) -> put(id, state.value.toString()) }
+    fun collectValues(): Map<String, String> {
+        collisionWarnings.clear()
+        return buildMap {
+            inputValues.forEach { (id, state) -> put(id, state.value) }
+            toggleValues.forEach { (id, state) ->
+                if (containsKey(id)) {
+                    collisionWarnings.add(
+                        "Form field id collision: '$id' is registered as both input and toggle; toggle value used."
+                    )
+                }
+                put(id, state.value.toString())
+            }
+        }
     }
 
     /**
@@ -81,6 +118,13 @@ class AmeFormState {
     }
 
     companion object {
-        private val INPUT_REF_REGEX = Regex("""\$\{input\.(\w+)\}""")
+        // Bug #13: the original `\w+` excluded `-`, so `${input.user-name}`
+        // was silently left unsubstituted. The character class below accepts
+        // letters, digits, underscores, and hyphens. The hyphen is placed at
+        // the end of the class to avoid being parsed as a range. The literal
+        // `.` separator is preserved so `${input.user.name}` (with a `.`)
+        // remains a non-match — defends against future over-permissive
+        // expansion that would shadow nested references.
+        private val INPUT_REF_REGEX = Regex("""\$\{input\.([a-zA-Z0-9_-]+)\}""")
     }
 }

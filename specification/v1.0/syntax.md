@@ -6,7 +6,7 @@ AME (Agentic Mobile Elements) is a line-oriented, streaming-first syntax for
 describing interactive user interfaces. It is designed for Large Language Models
 to generate and for native mobile renderers (Jetpack Compose, SwiftUI) to
 consume. Each line in an AME document is independently parseable, enabling
-progressive rendering as tokens stream from the model — the renderer can display
+progressive rendering as tokens stream from the model. The renderer can display
 partial UI with skeleton placeholders before the full document has arrived.
 
 This document defines the complete AME syntax rules and formal grammar. For the
@@ -75,7 +75,7 @@ host app's catalog. See [Custom Components](#custom-components) below.
 
 ### Rule 5: Positional Arguments
 
-Arguments to standard primitives are positional — their meaning is determined
+Arguments to standard primitives are positional. Their meaning is determined
 by position, not by name. Required arguments come first; optional arguments
 follow and MAY be omitted from the right.
 
@@ -341,7 +341,7 @@ any_char       = ? any Unicode character except newline ? ;
 ## Complete Examples
 
 Each example below is a valid AME document. Line numbers and annotations
-are provided for clarity — they are not part of the syntax.
+are provided for clarity; they are not part of the syntax.
 
 ### Example 1: Weather Card
 
@@ -568,7 +568,9 @@ parser SHOULD use the enum's default value and log a warning.
 ## Reserved Keywords
 
 The following identifiers have special meaning in AME and MUST NOT be used
-as user-defined identifiers.
+as user-defined identifiers. The reserved set is intentionally narrow: only
+tokens that the parser cannot disambiguate from a user identifier by
+position alone.
 
 ### Standard Primitive Names
 
@@ -588,51 +590,41 @@ as user-defined identifiers.
 
 `true`, `false`
 
-### TxtStyle Enum Values
-
-`display`, `headline`, `title`, `body`, `caption`, `mono`, `label`, `overline`
-
-### BtnStyle Enum Values
-
-`primary`, `secondary`, `outline`, `text`, `destructive`
-
-### BadgeVariant Enum Values
-
-`default`, `success`, `warning`, `error`, `info`
-
-### InputType Enum Values
-
-`text`, `number`, `email`, `phone`, `date`, `time`, `select`
-
-### Align Enum Values
-
-`start`, `center`, `end`, `space_between`, `space_around`
-
-### ChartType Enum Values
-
-`line`, `bar`, `pie`, `sparkline`
-
-### CalloutType Enum Values
-
-`info`, `warning`, `error`, `success`, `tip`
-
-### TimelineStatus Enum Values
-
-`done`, `active`, `pending`, `error`
-
-### SemanticColor Enum Values
-
-`primary`, `secondary`, `error`, `success`, `warning`
-
-Note: `error` appears in `CalloutType`, `TimelineStatus`, and
-`SemanticColor`. The parser disambiguates by argument position — `error`
-in a callout's first argument is `CalloutType.error`; in a timeline_item's
-third argument it is `TimelineStatus.error`; as a `color=` named argument
-it is `SemanticColor.error`.
-
 ### Data Separator
 
 `---` (three hyphens on a line by themselves)
+
+### Enum Value Tokens Are NOT Reserved
+
+Enum value tokens (for example `title`, `headline`, `primary`, `done`,
+`success`, `info`, `line`, `pie`) MAY appear as user-defined identifiers
+without restriction. The parser disambiguates by argument position:
+
+- The slot before `=` on a line is always a registry key (the LHS
+  identifier).
+- A bare token at a positional argument slot of a primitive call is
+  evaluated against that primitive's enum first, then falls back to a
+  registry lookup if no enum value matches.
+
+For example, `title = txt("Welcome", title)` is unambiguous: the LHS
+`title` is the registry key for the resulting txt node, while the second
+argument `title` resolves to `TxtStyle.title`. Both uses can co-exist in
+the same document because the parser knows which slot it is reading.
+
+This rule was intentionally narrowed in v1.2. Earlier drafts of the spec
+listed every enum value as reserved; in practice this rejected common
+LLM-emitted identifiers like `title` and `label` for a benefit (reader
+clarity) that the parser already provides through positional
+disambiguation. See `AUDIT_VERDICTS.md` Bug 9 for the audit trail.
+
+### `error` Token Disambiguation
+
+The token `error` appears in three different enums (`CalloutType`,
+`TimelineStatus`, `SemanticColor`). The parser disambiguates by argument
+position. In a callout's first argument it is `CalloutType.error`; in a
+timeline_item's third argument it is `TimelineStatus.error`; as a `color=`
+named argument it is `SemanticColor.error`. As a left-hand identifier it
+is a user-defined registry key with no enum semantics.
 
 ---
 

@@ -6,8 +6,8 @@ AME separates component structure from data. The structure section defines the
 UI layout and component hierarchy using AME statements. The data section
 provides a JSON object that supplies dynamic values to those components through
 `$path` references. This separation enables a powerful pattern: the structure
-is defined once and remains stable, while the data can be updated independently
-— enabling live search filtering, real-time data updates, and pagination
+is defined once and remains stable, while the data can be updated independently,
+enabling live search filtering, real-time data updates, and pagination
 without regenerating the UI layout.
 
 This document defines the `$path` reference system, the `---` data separator,
@@ -40,7 +40,7 @@ definition (`data_ref = "$" , identifier , { "/" , identifier }`).
 | `$identifier/subkey` | `$address/city` | Key `"city"` inside the `"address"` object |
 | `$identifier/subkey/subsubkey` | `$user/profile/avatar` | Key `"avatar"` inside `"profile"` inside `"user"` |
 
-Path segments are separated by `/`. Each segment is an object key lookup — the
+Path segments are separated by `/`. Each segment is an object key lookup. The
 renderer navigates into nested JSON objects following the path segments
 left to right.
 
@@ -211,7 +211,7 @@ The result is visually identical to defining three separate cards manually
 
 `each()` does NOT appear in [primitives.md](primitives.md). It is a
 **control-flow construct**, not a visual component. It does not render any UI
-of its own — it produces a sequence of instantiated templates that replace it
+of its own. It produces a sequence of instantiated templates that replace it
 in the parent's children list.
 
 In the grammar ([syntax.md](syntax.md) Grammar Note 4), `each` is parsed as a
@@ -248,7 +248,7 @@ of when expansion occurs:
 
 ### Nesting
 
-`each()` constructs MAY be nested — a template used by one `each()` may itself
+`each()` constructs MAY be nested: a template used by one `each()` may itself
 contain another `each()`. However, nested `each()` SHOULD be avoided in
 practice. A single level of `each()` covers all common use cases (flat lists,
 card lists, table rows). Nested `each()` increases template complexity and may
@@ -266,7 +266,7 @@ Understanding when each resolves is critical for correct behavior.
 
 ### `$path` — Data-Available Resolution
 
-`$path` references resolve when the data model is available — either at parse
+`$path` references resolve when the data model is available, either at parse
 time (if the data section is present) or at render time (if data arrives later,
 e.g. during streaming). They produce static values that do not change unless
 the data model itself is updated.
@@ -298,7 +298,7 @@ at tap time.
 
 ### `${input.fieldId}` — Dispatch-Time Resolution
 
-`${input.fieldId}` references resolve at **dispatch time** — the moment the
+`${input.fieldId}` references resolve at **dispatch time**, the moment the
 user taps a button. They read the current live value from the form state
 (the values the user has typed into `input` or `toggle` components).
 
@@ -329,12 +329,12 @@ from different sources, and resolve at different times.
 ## Why Two `$` Syntaxes?
 
 AME uses two `$`-prefixed syntaxes that serve different purposes at different
-times. They are intentionally distinct — not an inconsistency.
+times. They are intentionally distinct, not an inconsistency.
 
 ### `$path` — Whole-Value Substitution (Render-Time)
 
 `$path` replaces the ENTIRE argument value with a value from the data model.
-No braces are needed because the reference IS the whole value — there is
+No braces are needed because the reference IS the whole value; there is
 nothing else in the string to delimit it from.
 
 ```
@@ -343,7 +343,7 @@ addr_label = txt($address, caption)  // $address IS the entire text content
 dir_btn = btn("Go", uri($map_url))   // $map_url IS the entire URI
 ```
 
-Resolution happens when the data model (after `---`) is available — either at
+Resolution happens when the data model (after `---`) is available, either at
 parse time or render time. Once resolved, the value is static.
 
 ### `${input.fieldId}` — String Interpolation (Dispatch-Time)
@@ -359,7 +359,7 @@ Here, `${input.date}` and `${input.time}` are embedded within the string
 `"Dinner on ... at ..."`. Without braces, the parser could not determine
 where the reference ends and the literal text resumes.
 
-Resolution happens at **dispatch time** — when the user taps the button.
+Resolution happens at **dispatch time**, when the user taps the button.
 The values come from the live form state (current contents of `input` and
 `toggle` fields), not from the data model.
 
@@ -480,8 +480,8 @@ data-only updates to load additional items incrementally.
 ### Array Indexing
 
 Version 1.0 of AME does **not** support array indexing in `$path` references.
-A path like `$items/0/name` (accessing index 0 of an array) is not valid —
-the `0` segment is treated as an object key lookup, which will fail on an
+A path like `$items/0/name` (accessing index 0 of an array) is not valid.
+The `0` segment is treated as an object key lookup, which will fail on an
 array value and resolve to an empty string.
 
 To access individual array elements, use `each()` for iteration. A future

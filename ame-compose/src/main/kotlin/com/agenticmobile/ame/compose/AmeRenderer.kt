@@ -62,6 +62,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -753,7 +754,16 @@ private fun AmeCode(node: AmeNode.Code, modifier: Modifier) {
     }
 }
 
-/** Collapsible section with animated chevron and expand/shrink transition. */
+/** Collapsible section with animated chevron and expand/shrink transition.
+ *
+ * Bug #18 (WP#5): the previous implementation captured `node.expanded`
+ * once at first composition, so server-pushed updates to the accordion's
+ * expanded state were silently ignored. The fix mirrors the WP#4 Bug 5
+ * separate-state pattern: a local `@Composable` snapshot drives the UI,
+ * and a [LaunchedEffect] keyed on `node.expanded` syncs the snapshot to
+ * the latest external value when the host re-renders. Local user taps
+ * still flip `isExpanded` immediately and persist until the next external
+ * change. */
 @Composable
 private fun AmeAccordion(
     node: AmeNode.Accordion,
@@ -763,6 +773,9 @@ private fun AmeAccordion(
     depth: Int,
 ) {
     var isExpanded by remember { mutableStateOf(node.expanded) }
+    LaunchedEffect(node.expanded) {
+        isExpanded = node.expanded
+    }
     val chevronRotation by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
         animationSpec = tween(200),

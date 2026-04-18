@@ -1,0 +1,7 @@
+// conformance/57-chart-series-array-of-paths.ame
+// Tests: chart `series=[$a, $b]` array-of-paths multi-series resolution (Bug 7).
+// Pre-WP#2 the resolved series was empty; post-WP#2 each path produces one series
+// and the resolved JSON contains "series":[[1.0,2.0,3.0],[4.0,5.0,6.0]].
+root = chart(line, series=[$a, $b], labels=["Q1","Q2","Q3"])
+---
+{"a":[1,2,3],"b":[4,5,6]}
