@@ -124,6 +124,10 @@ The audit regression suite lives in:
 - `ame-compose/src/test/kotlin/com/agenticmobile/ame/compose/AuditedBugRegressionTest.kt`
 - `ame-swiftui/Tests/AMESwiftUITests/AuditedBugRegressionTests.swift`
 - `ame-swiftui/Tests/AMESwiftUITests/AuditedSwiftUIBugTests.swift`
+- `ame-flutter/test/audited_bug_regression_test.dart`
+- `ame-flutter-ui/test/audited_ui_bug_regression_test.dart`
+- `ame-flutter-ui/test/audited_chart_math_test.dart`
+- `ame-flutter-ui/test/audited_form_state_test.dart`
 
 Each test corresponds to one row in
 [`AUDIT_VERDICTS.md`](../../AUDIT_VERDICTS.md) and either proves a known
@@ -145,9 +149,9 @@ cd ame-spec
 # 2. Build the reference Kotlin CLI.
 ./gradlew :ame-core:installDist
 
-# 3. Run the parity script. It runs the reference Kotlin CLI and the
-#    reference Swift CLI against every conformance case and diffs against
-#    the expected.json. The script runs each runtime independently per
+# 3. Run the parity script. It runs the reference Kotlin, Swift, and
+#    Flutter CLIs against every conformance case and diffs against the
+#    expected.json. The script runs each runtime independently per
 #    fixture (Bug 16 was fixed in v1.2; see AUDIT_VERDICTS.md).
 ./conformance/check-parity.sh
 
@@ -206,8 +210,8 @@ performs this regeneration. See `regression-protocol.md` §4.
 
 ## 5. Implementing AME on a New Platform
 
-For implementers porting AME to Flutter, React Native, Kotlin/XML, or any
-other framework:
+For implementers porting AME to a fourth runtime (e.g., React Native,
+Kotlin/XML, Compose Multiplatform, or any other framework):
 
 1. Implement the parser per [syntax.md](syntax.md) and
    [data-binding.md](data-binding.md). Use `AmeNode.kt` or `AmeNode.swift`

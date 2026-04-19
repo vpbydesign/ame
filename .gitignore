@@ -14,3 +14,13 @@ local.properties
 # only.
 WP*_COMPLETION_REPORT.md
 ANNOUNCEMENT_*_DRAFT.md
+
+# Dart / Flutter build artifacts (generated; never commit)
+.dart_tool/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Library packages: lockfiles are per-consumer
+ame-flutter/pubspec.lock
+ame-flutter-ui/pubspec.lock

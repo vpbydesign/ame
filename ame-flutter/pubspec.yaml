@@ -1,0 +1,10 @@
+name: ame_flutter
+description: AME (Agentic Mobile Elements) parser and data model for Dart/Flutter
+version: 1.3.0
+homepage: https://github.com/anthropics/ame-spec
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dev_dependencies:
+  test: ^1.25.0

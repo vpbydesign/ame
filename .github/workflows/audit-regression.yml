@@ -81,9 +81,51 @@ jobs:
           swift test --filter AuditedBugRegressionTests
           swift test --filter AuditedSwiftUIBugTests
 
+  flutter-tests:
+    name: Flutter (ame-flutter + ame-flutter-ui)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.7'
+          channel: 'stable'
+
+      - name: Resolve Flutter packages
+        run: |
+          cd ame-flutter && dart pub get
+          cd ../ame-flutter-ui && flutter pub get
+
+      - name: ame-flutter full test suite
+        run: cd ame-flutter && dart test
+
+      - name: ame-flutter audit regression suite
+        run: cd ame-flutter && dart test test/audited_bug_regression_test.dart
+
+      - name: ame-flutter-ui full test suite
+        run: cd ame-flutter-ui && flutter test
+
+      - name: ame-flutter-ui audit regression suites
+        run: |
+          cd ame-flutter-ui
+          flutter test test/audited_ui_bug_regression_test.dart
+          flutter test test/audited_chart_math_test.dart
+          flutter test test/audited_form_state_test.dart
+
+      - name: Upload Flutter test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-test-reports
+          path: |
+            ame-flutter/test_reports/
+            ame-flutter-ui/test_reports/
+
   conformance-parity:
     name: Conformance suite parity
-    needs: [kotlin-tests, swift-tests]
+    needs: [kotlin-tests, swift-tests, flutter-tests]
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -94,6 +136,15 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.7'
+          channel: 'stable'
+
+      - name: Resolve Flutter dependencies
+        run: cd ame-flutter && dart pub get
+
       - name: Build Kotlin reference CLI
         run: ./gradlew :ame-core:installDist
 
@@ -102,7 +153,7 @@ jobs:
 
   audit-summary:
     name: Audit verdict summary
-    needs: [kotlin-tests, swift-tests, conformance-parity]
+    needs: [kotlin-tests, swift-tests, flutter-tests, conformance-parity]
     if: always()
     runs-on: ubuntu-latest
     steps:

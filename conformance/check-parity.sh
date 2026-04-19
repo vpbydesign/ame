@@ -35,8 +35,9 @@ CONFORMANCE_DIR="conformance"
 RUNTIMES=(
     "kotlin|./ame-core/build/install/ame-core/bin/ame-core {{ame_file}}"
     "swift|(cd ame-swiftui && swift run -q ame-conformance-swift ../{{ame_file}})"
+    "flutter|(cd ame-flutter && dart run bin/ame_conformance_cli.dart ../{{ame_file}})"
     # Future runtime ports register here, e.g.:
-    # "flutter|./ame-flutter/build/bin/ame-conformance-flutter {{ame_file}}"
+    # "react-native|node ./ame-react-native/dist/cli.js {{ame_file}}"
 )
 
 NUM_RUNTIMES=${#RUNTIMES[@]}

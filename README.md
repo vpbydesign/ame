@@ -47,8 +47,9 @@ as for any other LLM-initiated action.
   Flash Preview and Claude Sonnet 4.6 with the standard system prompt.
   [Benchmark →](benchmarks/llm-reliability.md)
 
-- **Native mobile.** Jetpack Compose and SwiftUI renderers. Material 3
-  theming on Android, SF Symbols and system fonts on iOS. No WebView.
+- **Native mobile.** Jetpack Compose, SwiftUI, and Flutter renderers.
+  Material 3 theming on Android and Flutter, SF Symbols and system fonts
+  on iOS. No WebView.
 
 - **Action safety.** Button taps route through the host app's trust
   pipeline — same confirmation and risk system as LLM-initiated tool calls.
@@ -62,6 +63,7 @@ as for any other LLM-initiated action.
 ## Quick Start
 
 ```kotlin
+// Kotlin Compose
 // 1. Parse AME text into a node tree
 val parser = AmeParser()
 val tree = parser.parse(ameString)
@@ -91,6 +93,43 @@ CompositionLocalProvider(LocalAmeTheme provides myThemeConfig) {
 }
 ```
 
+```dart
+// Flutter (Dart)
+// 1. Parse AME text into a node tree
+final tree = AmeParser().parse(ameString);
+
+// 2. Render with Material 3
+if (tree != null) {
+  AmeRenderer(
+    node: tree,
+    formState: AmeFormState(),
+    onAction: (action) => handleAction(action),
+  );
+}
+
+// 3. Handle actions from the host app
+void handleAction(AmeAction action) {
+  switch (action) {
+    case AmeCallTool(:final name, :final args):
+      toolSystem.execute(name, args);
+    case AmeOpenUri(:final uri):
+      launchUrl(Uri.parse(uri));
+    case AmeNavigate(:final route):
+      Navigator.pushNamed(context, route);
+    case AmeCopyText(:final text):
+      Clipboard.setData(ClipboardData(text: text));
+    case AmeSubmit():
+      // Resolved to AmeCallTool by renderer before dispatch
+      break;
+  }
+}
+```
+
+The Compose and SwiftUI quick starts share the Kotlin/Swift sealed-class
+ergonomics; the Dart equivalent uses Dart 3 sealed classes and pattern
+matching for the same shape. See [`ame-flutter-ui/`](ame-flutter-ui/) for
+the full Flutter renderer surface.
+
 ## Comparison
 
 | Dimension | AME | A2UI v0.9 | Raw JSON | MCP Apps | OpenUI Lang |
@@ -98,7 +137,7 @@ CompositionLocalProvider(LocalAmeTheme provides myThemeConfig) {
 | Token cost (avg) | 1x (baseline) | 1.77x | ~0.87x † | N/A (HTML) | ~0.95x \* |
 | Streaming | Line-by-line | Flat list | Not streamable | Pre-built | Line-by-line |
 | Zero-token rendering | Yes | No | No | No | No |
-| Mobile-native renderer | Compose + SwiftUI | Flutter | Custom code | WebView | React |
+| Mobile-native renderer | Compose + SwiftUI + Flutter | Flutter | Custom code | WebView | React |
 | Typed AST + error recovery | Yes | No | No | No | No |
 | Action safety | Host trust pipeline | Event-based | N/A | iframe sandbox | Callbacks |
 
@@ -116,7 +155,7 @@ documentation and measured token counts.
 
 ## Specification
 
-The complete AME v1.2 specification: [specification/v1.0/](specification/v1.0/README.md)
+The complete AME v1.3 specification: [specification/v1.0/](specification/v1.0/README.md)
 
 | Document | Description |
 |----------|-------------|
@@ -134,8 +173,9 @@ The complete AME v1.2 specification: [specification/v1.0/](specification/v1.0/RE
 
 AME maintains a three-tier test discipline:
 
-1. **Unit tests** in each module: parser, serializer, renderer logic
-   (`./gradlew :ame-core:test`, `cd ame-swiftui && swift test`).
+1. **Unit tests** in each module: parser, serializer, renderer logic.
+   Run all six audit suites (Kotlin parser, Compose, Swift parser, SwiftUI
+   render, Flutter parser, Flutter UI) via [`./verify-bugs.sh`](verify-bugs.sh).
 2. **Conformance suite**: 57 canonical `.ame` to JSON cases in
    [conformance/](conformance/), verified via
    [`conformance/check-parity.sh`](conformance/check-parity.sh). The
@@ -202,7 +242,9 @@ ame-spec/
 ├── ame-core/              # Kotlin data model + parser (AmeNode, AmeAction, AmeParser, AmeSerializer)
 ├── ame-compose/           # Jetpack Compose renderer (AmeRenderer, AmeTheme, AmeFormState, AmeIcons, AmeChartRenderer)
 ├── ame-swiftui/           # SwiftUI renderer (AmeRenderer, AmeTheme, AmeFormState, AmeIcons)
-├── conformance/           # 55 conformance tests with Kotlin-Swift parity check
+├── ame-flutter/           # Dart parser + serializer (AmeNode, AmeParser, AmeSerializer; pub package)
+├── ame-flutter-ui/        # Flutter renderer (AmeRenderer, AmeTheme, AmeFormState, AmeIcons, AmeChartPainter; pub package)
+├── conformance/           # 57 conformance tests with multi-runtime parity check (kotlin, swift, flutter)
 ├── benchmarks/            # Token comparison, streaming latency, LLM reliability
 └── examples/              # 9 standalone .ame files
 ```
@@ -233,13 +275,13 @@ The following limitations are known and planned for future versions:
    Host apps document their custom components in their system prompts. A
    formal custom catalog schema is planned for a future version.
 
-4. **Two independent parsers.** The reference implementation includes
-   independent Kotlin and Swift parsers that must produce identical output.
-   Parser parity is enforced by the conformance test suite
-   (`conformance/check-parity.sh`) with 55 test cases covering all 21
-   primitives. Both parsers implement `each()` expansion at parse time — in
-   streaming mode, `each()` nodes show a shimmer placeholder until the data
-   section arrives.
+4. **Three independent parsers.** The reference implementation includes
+   independent Kotlin, Swift, and Flutter parsers that must produce
+   identical output. Parser parity is enforced by the conformance test
+   suite (`conformance/check-parity.sh`) with 57 test cases covering all 21
+   primitives. All three parsers implement `each()` expansion at parse
+   time. In streaming mode, `each()` nodes show a shimmer placeholder
+   until the data section arrives.
 
 ## License
 

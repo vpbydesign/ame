@@ -1,8 +1,8 @@
-# AME Specification — Version 1.2
+# AME Specification — Version 1.3
 
 > Directory name `v1.0` is the layout version, retained for backlink stability across releases. Spec contents reflect the current AME version (see Version History at the bottom of this page).
 
-The AME v1.2 specification defines a compact, streaming-first syntax for
+The AME v1.3 specification defines a compact, streaming-first syntax for
 describing interactive user interfaces, designed for LLM generation and
 native mobile rendering.
 
@@ -28,8 +28,8 @@ self-verification procedure, the multi-runtime extension procedure, and
 rules for adding or changing conformance tests, is consolidated in
 [conformance.md](conformance.md).
 
-AME has reference implementations in Kotlin (Compose) and Swift (SwiftUI).
-Additional runtime ports follow the procedure in
+AME has reference implementations in Kotlin (Compose), Swift (SwiftUI),
+and Dart (Flutter). Additional runtime ports follow the procedure in
 [conformance.md](conformance.md) §5; the multi-runtime parity script
 [`conformance/check-parity.sh`](../../conformance/check-parity.sh) accepts
 new runtimes via a one-line configuration entry.
@@ -61,4 +61,5 @@ INCONCLUSIVE) lives at
 |---------|------|--------|
 | 1.0 | 2026-04-05 | Superseded by v1.1 |
 | 1.1 | 2026-04-11 | Superseded by v1.2 |
-| 1.2 | 2026-04-18 | Current. Audit fixes, conformance methodology, AME Strict Conformance level, multi-runtime conformance tooling. |
+| 1.2 | 2026-04-18 | Superseded by v1.3 |
+| 1.3 | 2026-04-XX | Current. Flutter joins as third reference runtime; Flutter port aligned with v1.2 audit history; one architectural Flutter-specific finding fixed; one phantom audit claim refuted. |

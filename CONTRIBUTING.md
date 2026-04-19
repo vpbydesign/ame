@@ -29,6 +29,11 @@ New primitives are significant spec changes. The process:
    - `ame-swiftui/.../AmeParser.swift` — add the builder function
    - `ame-swiftui/.../AmeParserTests.swift` — add parse tests
    - `ame-swiftui/.../AmeRenderer.swift` — add SwiftUI rendering
+   - `ame-flutter/lib/src/ame_node.dart` — add the AST class
+   - `ame-flutter/lib/src/ame_parser.dart` — add the builder function
+   - `ame-flutter/test/ame_parser_test.dart` — add parse tests
+   - `ame-flutter-ui/lib/src/ame_renderer.dart` — add Flutter rendering
+   - `ame-flutter-ui/test/ame_renderer_test.dart` — add widget tests
    - `conformance/` — add at least one conformance test input + expected output
 3. Run `./conformance/check-parity.sh` and verify zero diffs.
 4. Run `./verify-bugs.sh` and verify all audit regression tests still pass.
@@ -36,9 +41,10 @@ New primitives are significant spec changes. The process:
 
 ## How to Contribute a Renderer for a New Platform
 
-AME is platform-neutral. Renderers for Flutter, React Native, Kotlin/XML,
-or any other framework are welcome as separate repositories or as
-subdirectories in this repo.
+AME is platform-neutral. Reference renderers for Compose, SwiftUI, and
+Flutter live in this repository. Renderers for React Native, Kotlin/XML,
+Compose Multiplatform, or any other framework are welcome as separate
+repositories or as additional subdirectories.
 
 A conformant renderer must:
 
@@ -58,7 +64,7 @@ When reporting a bug, include:
 - **Actual** — what it actually produces (JSON output, screenshot, error
   message, or stack trace)
 - **Platform** — which runtime (`ame-core`, `ame-compose`, `ame-swiftui`,
-  or a third-party implementation) and version
+  `ame-flutter`, `ame-flutter-ui`, or a third-party implementation) and version
 - **Severity hypothesis** — your initial guess (CRITICAL / HIGH / MEDIUM / LOW)
 
 Do NOT include speculation about the root cause unless you have read the
@@ -81,6 +87,10 @@ Summary:
    - `ame-compose/src/test/kotlin/com/agenticmobile/ame/compose/AuditedBugRegressionTest.kt`
    - `ame-swiftui/Tests/AMESwiftUITests/AuditedBugRegressionTests.swift`
    - `ame-swiftui/Tests/AMESwiftUITests/AuditedSwiftUIBugTests.swift`
+   - `ame-flutter/test/audited_bug_regression_test.dart`
+   - `ame-flutter-ui/test/audited_ui_bug_regression_test.dart`
+   - `ame-flutter-ui/test/audited_chart_math_test.dart`
+   - `ame-flutter-ui/test/audited_form_state_test.dart`
 2. Use the standard docstring template (see "Adding a Regression Test" below).
 3. Run the suite. The test MUST fail today if the bug is REAL, or pass if
    the claim is NOT REAL.
@@ -117,27 +127,42 @@ Standard docstring template (Swift):
 func testDescriptiveBehaviorThatBugViolated() { ... }
 ```
 
-Naming convention: prefer `testDescriptiveBehaviorThatBugViolated`
-(positive assertion of correct behavior) over `testBugNDescription`
-(negative; loses meaning after the fix). The test name should still make
-sense after the bug is fixed.
+Standard docstring template (Dart):
+
+```dart
+/// Audit Bug #N: <one-line description>.
+///
+/// Spec section: specification/v1.0/<file>.md (<section>)
+/// Audit reference: AUDIT_VERDICTS.md#bug-N
+/// Pre-fix expected: <FAIL or PASS> — <why>
+/// Post-fix expected: <FAIL or PASS> — <correct behavior>
+test('descriptive behavior that bug violated', () { ... });
+```
+
+Naming convention: prefer the positive assertion of correct behavior
+(`testDescriptiveBehaviorThatBugViolated` in Kotlin/Swift, descriptive
+test string in Dart) over `testBugNDescription` (negative; loses meaning
+after the fix). The test name should still make sense after the bug is
+fixed. Dart uses `package:test`'s descriptive-string convention rather
+than method-name camelCase.
 
 ## Running the Full Test Suite
 
 Before submitting a PR:
 
 ```bash
-# Standard tests (existing)
-./gradlew :ame-core:test
-./gradlew :ame-compose:testDebugUnitTest
-cd ame-swiftui && swift test
-
-# Conformance parity check
-./conformance/check-parity.sh
-
-# Audit regression suite (Strict Conformance)
+# Audit regression suite (covers all 6 reference suites: Kotlin parser,
+# Compose, Swift parser, SwiftUI render, Flutter parser, Flutter UI)
 ./verify-bugs.sh
+
+# Conformance parity check (kotlin, swift, flutter byte-equal across 57 fixtures)
+./conformance/check-parity.sh
 ```
+
+`./verify-bugs.sh` is the single source of truth for which suites the
+project considers normative. When a new runtime is added, append its
+`run_suite` invocation to the script and the contributor docs do not
+need to change.
 
 If any audit regression test that was previously passing now fails, your
 PR introduced a regression. Either fix the regression or escalate via PR
@@ -159,6 +184,9 @@ carry the `BREAKING-CONFORMANCE` label and document each change per
 
 - Kotlin: follow the existing code style in `ame-core/`
 - Swift: follow the existing code style in `ame-swiftui/`
+- Dart: follow the existing code style in `ame-flutter/` and
+  `ame-flutter-ui/`; use `dart format` and `flutter analyze` before
+  submitting
 - Spec documents: use RFC 2119 normative language (MUST/SHOULD/MAY)
 - Test files: docstrings on every audit regression test per the template above
 

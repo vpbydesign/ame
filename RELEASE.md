@@ -14,15 +14,17 @@ Copy this checklist into the release PR description and check off each item.
 
 ### 1. Reference implementation tests
 
-- [ ] `./gradlew :ame-core:test` — all tests pass
-- [ ] `./gradlew :ame-compose:testDebugUnitTest` — all tests pass
-- [ ] `cd ame-swiftui && swift test` — all tests pass
+- [ ] `./verify-bugs.sh` — all 6 audit suites pass (Kotlin parser, Compose,
+  Swift parser, SwiftUI render, Flutter parser, Flutter UI). The script is
+  the single source of truth for which suites the project considers
+  normative; new runtimes are added by appending a `run_suite` invocation.
 
 ### 2. Conformance suite
 
 - [ ] `./conformance/check-parity.sh` — zero diffs against expected JSON
-- [ ] Swift CLI runs independently of Kotlin pass/fail (multi-runtime
-  `check-parity.sh`) and shows zero diffs
+- [ ] All runtime CLIs run independently per fixture (kotlin, swift,
+  flutter) via the multi-runtime `conformance/check-parity.sh`, and each
+  shows zero diffs
 
 ### 3. Audit regression suite
 

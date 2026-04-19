@@ -36,6 +36,17 @@ if [[ -n "${JAVA_HOME:-}" ]]; then
     export PATH="$JAVA_HOME/bin:$PATH"
 fi
 
+# Confirm Flutter is on PATH for the Flutter audit suites. The script
+# does not attempt to auto-locate the Flutter SDK because install paths
+# vary widely across macOS and Linux (brew, fvm, manual git clone, etc.).
+# Operators must have `flutter` on PATH; the resolver fails fast with a
+# clear pointer if it is missing.
+if ! command -v flutter > /dev/null 2>&1; then
+    echo "WARNING: 'flutter' not found on PATH. The Flutter audit suites"
+    echo "         will fail. Install Flutter (https://flutter.dev/docs/get-started/install)"
+    echo "         or add it to PATH, then re-run."
+fi
+
 results=()
 overall_status=0
 
@@ -65,6 +76,12 @@ run_suite "Swift parser audit (ame-swiftui)" \
 
 run_suite "SwiftUI render audit (ame-swiftui)" \
     bash -c 'cd ame-swiftui && swift test --filter AuditedSwiftUIBugTests'
+
+run_suite "Flutter parser audit (ame-flutter)" \
+    bash -c 'cd ame-flutter && dart test test/audited_bug_regression_test.dart'
+
+run_suite "Flutter UI audit (ame-flutter-ui)" \
+    bash -c 'cd ame-flutter-ui && flutter test test/audited_ui_bug_regression_test.dart test/audited_chart_math_test.dart test/audited_form_state_test.dart'
 
 echo
 echo "================================================================"

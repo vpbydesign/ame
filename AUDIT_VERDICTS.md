@@ -12,17 +12,19 @@ for the lifecycle rules that govern entries in this document.
 - Date: 2026-04-18
 - Phase 1 commit: see git log
 - Phase 2 (v1.2) status: All audit bugs fixed across WP#1-6 (Bugs 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18) plus Bug 21 (discovered + fixed in WP#2). v1.2 audit fix work complete; released as v1.2.0. 3 newly-discovered bugs deferred to v1.3 (23, 24, 25).
-- Suites run: 4 (ame-core, ame-compose, ame-swiftui parser, ame-swiftui UI)
-- Total tests: 53 (WP#1 added Bug 3c; WP#2 added Bug 7b mismatched-length and 3 Bug 21 canonical-Double tests; WP#3 added Bug 8b chunked-JSON and Bug 11b diamond-ref tests; the original Bug 9 test was inverted to `testEnumValueTokensAreNotReserved` per Path D, with tech-team sign-off recorded under Bug 9; WP#4 added 3 deeper-coverage tests; WP#5 added the Q4 `testChartMathRangeIncludesZeroForMixedSign` permanent guard for the cross-zero range invariant and the Q4 `testInputRefRegexRejectsDotInsideFieldId` guard in BOTH runtimes to defend against future over-permissive expansion of the input-ref character class)
-- REAL bugs verified: 20 (Bug 21 added in WP#2 from a divergence exposed by conformance fixture 57; Bugs 23, 24, 25 discovered during WP#4/WP#5 and deferred to v1.3 per v1.2 scope discipline)
+- Phase 2 (v1.3) Stage 1 status (WP#7 Flutter alignment, commit pending): All 12 Flutter-equivalent v1.2 bugs verified, fixed, and locked in (Bugs 26, 27, 28, 30, 31, 32, 33, 34, 35, 36, 37); 1 architectural Flutter-specific bug discovered and fixed (Bug 38 date/time picker controller hoisting); 1 phantom claim refuted (Bug 29 Dart Double serialization — Dart preserves `.0` natively, no fix required). Multi-runtime parity script `conformance/check-parity.sh` activated for Flutter; legacy `flutter-check-parity.sh` deleted. All 57 conformance fixtures pass byte-equal for kotlin, swift, AND flutter.
+- Suites run: 6 (ame-core, ame-compose, ame-swiftui parser, ame-swiftui UI, ame-flutter parser/serializer, ame-flutter-ui renderer/state)
+- Total tests: 83 (53 from v1.2 + 30 added in WP#7 across `audited_bug_regression_test.dart` (15: Bugs 26a/b/c, 27a/b/c, 29a/b/c phantom guards, 30, 31a/b, 32a/b, 35), `audited_chart_math_test.dart` (6: Bug 28a-d behavioral + Q4 invariant + empty-input edge case), `audited_ui_bug_regression_test.dart` (7: Bug 28 sentinel, Bug 33 sentinel, Bug 34a/b, 36, 37, 38), and `audited_form_state_test.dart` (3: Bug 33 behavioral + 2 guard tests))
+- REAL bugs verified: 31 (20 from v1.2 + 11 confirmed REAL in WP#7: Bugs 26, 27, 28, 30, 31, 32, 33, 34, 35, 36, 37, plus Bug 38 architectural finding)
 - REAL bugs fixed in v1.2 Stage 1 (WP#1): 1 (Bug 3)
 - REAL bugs fixed in v1.2 Stage 2 (WP#2): 4 (Bugs 6, 7, 10, 21)
 - REAL bugs fixed in v1.2 Stage 3 (WP#3): 3 (Bugs 8, 9, 11)
 - REAL bugs fixed in v1.2 Stage 4 (WP#4): 3 (Bugs 1, 2, 5)
 - REAL bugs fixed in v1.2 Stage 5 (WP#5): 6 (Bugs 4, 12, 13, 14, 15, 18)
 - REAL bugs fixed in v1.2 Stage 6 (WP#6): 1 (Bug 16; check-parity.sh rewrite for multi-runtime independence)
-- NOT REAL refuted: 4
-- Documentation-only divergences: 0 (Bug 10 resolved in WP#2 by aligning spec to AST; Bug 9 resolved in WP#3 by retracting an over-aggressive spec rule the parser was not enforcing; Bug 1 in WP#4 also corrected `primitives.md:1083` so the `labels` description matches actual Compose+SwiftUI behavior; Bug 18 in WP#5 added the accordion reactivity contract to `primitives.md`'s `expanded` row as part of the Bug 18 resolution itself)
+- REAL bugs fixed in v1.3 Stage 1 (WP#7): 12 (Bugs 26, 27, 28, 30, 31, 32, 33, 34, 35, 36, 37, 38)
+- NOT REAL refuted: 5 (Bug 17, Bug 19 from v1.2; Bug 29 from WP#7 — Dart `jsonEncode` preserves `.0` natively, unlike Swift Foundation)
+- Documentation-only divergences: 0 (Bug 10 resolved in WP#2 by aligning spec to AST; Bug 9 resolved in WP#3 by retracting an over-aggressive spec rule the parser was not enforcing; Bug 1 in WP#4 also corrected `primitives.md:1083` so the `labels` description matches actual Compose+SwiftUI behavior; Bug 18 in WP#5 added the accordion reactivity contract to `primitives.md`'s `expanded` row as part of the Bug 18 resolution itself; WP#7 introduced no spec changes — Flutter aligns to existing v1.2 normative text)
 
 ---
 
@@ -815,6 +817,184 @@ for the lifecycle rules that govern entries in this document.
 
 ---
 
+## Bug 26: Flutter parser corrupts component calls when string literals contain `)` or `]`
+
+- Audit claim severity: CRITICAL
+- Verified severity: CRITICAL
+- Platforms: Flutter (ame-flutter)
+- Verifying tests:
+  - `audited_bug_regression_test.dart::paren inside string literal is preserved` (ame-flutter)
+  - `audited_bug_regression_test.dart::bracket inside string literal is preserved` (ame-flutter)
+  - `audited_bug_regression_test.dart::escaped quote followed by paren is preserved` (ame-flutter, deeper coverage mirroring Kotlin Bug 3c)
+- Status: **REAL — FIXED in v1.3 (commit pending)**
+- Evidence: pre-fix the parser truncated `txt("a)b", body)` to `text == "a"` because `_extractParenContent` and `_parseArray` ignored string boundaries. Fixed in WP#7 by adding `inString` / `escaped` state to both helpers, mirroring the existing `_splitTopLevel` and `_findTopLevelParen` patterns and the Kotlin canonical implementation at `AmeParser.kt::extractParenContent` and `parseArray` v1.2. All 3 verifying tests now pass.
+- Conformance impact: **none** — verified by all 57 conformance fixtures still passing for Flutter post-fix (no `BREAKING-CONFORMANCE`).
+- Notes: Flutter analog of v1.2 Bug 3. The pre-fix `_splitTopLevel` was already string-aware, which is why this bug was localized to the two helpers above.
+
+## Bug 27: Flutter ref recursion has no cycle limit (parser stack overflow)
+
+- Audit claim severity: HIGH
+- Verified severity: HIGH (confirmed Dart actually throws StackOverflowError on `a=b, b=a, root=a`)
+- Platforms: Flutter (ame-flutter)
+- Verifying tests:
+  - `audited_bug_regression_test.dart::circular ref does not stack overflow` (ame-flutter, runtime test with 5s timeout)
+  - `audited_bug_regression_test.dart::diamond ref pattern resolves correctly` (ame-flutter, deeper coverage mirroring Kotlin Bug 11b)
+  - `audited_bug_regression_test.dart::resolve tree contains visited cycle detection` (ame-flutter, structural source check mirroring Swift WP#3 fallback for belt-and-braces guard)
+- Status: **REAL — FIXED in v1.3 (commit pending)**
+- Evidence: pre-fix `parser.getResolvedTree()` on a registry containing `a = b`, `b = a`, `root = a` threw `StackOverflowError` (captured in WP#7 Phase B failing test output: `threw StackOverflowError:<Stack Overflow>`). Fixed in WP#7 by threading an immutable `Set<String> visited` through `_resolveTree`, `_resolveChildren`, and `_expandEach`. When an `AmeRef.id` reappears inside `visited`, a warning is recorded and the unresolved Ref is returned. The set is rebuilt per call (`{...visited, id}`) so sibling branches and diamond refs (`a -> c, b -> c`) resolve independently per WP#3 observation 3.
+- Conformance impact: **none** — verified by all 57 conformance fixtures still passing for Flutter post-fix.
+- Notes: Flutter analog of v1.2 Bug 11. Severity matches Kotlin's HIGH because Dart actually crashes (StackOverflowError) just like the JVM.
+
+## Bug 28: Flutter chart math breaks on negative values, single points, mismatched series lengths
+
+- Audit claim severity: HIGH
+- Verified severity: HIGH
+- Platforms: Flutter (ame-flutter-ui)
+- Verifying tests:
+  - `audited_chart_math_test.dart::bar chart math handles all negative values` (ame-flutter-ui, calls `ChartMath.computeRange` + `computeBar` directly)
+  - `audited_chart_math_test.dart::line chart Y stays in bounds for negative values` (ame-flutter-ui, calls `ChartMath.computeLineY` directly)
+  - `audited_chart_math_test.dart::multi series X axis alignment` (ame-flutter-ui, calls `ChartMath.computeSharedStepX` directly)
+  - `audited_chart_math_test.dart::chart math range includes zero for mixed sign` (ame-flutter-ui, Q4 permanent guard mirroring Compose WP#5 hardening)
+  - `audited_chart_math_test.dart::computeRange tolerates empty input` (ame-flutter-ui, edge-case guard)
+  - `audited_ui_bug_regression_test.dart::ChartMath class is extracted with required methods` (ame-flutter-ui, source-structural sentinel)
+- Status: **REAL — FIXED in v1.3 (commit pending)** (4 sub-bugs)
+- Evidence: WP#7 extracted production math into a top-level `@visibleForTesting class ChartMath` (sign-aware `computeRange`, `computeBar`, `computeLineY`, shared `computeSharedStepX`) and a paired `ChartRange` data class. `_BarChartPainter` now uses `ChartMath.computeBar` so positive bars rise from a baseline at value=0 and negative bars hang from it (Bug 4a). `_LineChartPainter` uses `ChartMath.computeLineY` so y values stay in `[0, chartHeight]` for negative-only data (Bug 4b), and `ChartMath.computeSharedStepX(maxPoints)` so index N of every series lands at the same x coordinate (Bug 4d). `CanvasChartRenderer.renderChart` adds a line-chart-specific empty-state branch that renders the documented "No chart data" widget when no series has >= 2 points (Bug 4c). All 6 audit tests pass post-fix; the math is a verbatim port of Compose `internal object ChartMath` (lines 91-165 of `AmeChartRenderer.kt`).
+- Conformance impact: **none** — renderer math; serializer JSON unchanged. Verified by all 57 conformance fixtures still passing for Flutter post-fix.
+- Notes: Flutter analog of v1.2 Bug 4. The behavioral ChartMath tests live in a dedicated file `audited_chart_math_test.dart` because Bug 28's pre-fix state had no ChartMath class to reference; the source-structural sentinel in `audited_ui_bug_regression_test.dart` carries the always-compiles failing-test signal. Together they provide both pre-fix per-bug visibility AND post-fix behavioral coverage that mirrors Compose verbatim.
+
+## Bug 29: Dart `jsonEncode` strips trailing `.0` from whole-number Doubles, breaking cross-runtime parity
+
+- Audit claim severity: HIGH (suspected)
+- Verified severity: N/A — phantom claim
+- Platforms: Flutter (ame-flutter)
+- Verifying tests:
+  - `audited_bug_regression_test.dart::chart values serialize with kotlin canonical form` (ame-flutter) — PASSED (NOT REAL)
+  - `audited_bug_regression_test.dart::chart series serialize with kotlin canonical form` (ame-flutter) — PASSED (NOT REAL)
+  - `audited_bug_regression_test.dart::progress value serializes with kotlin canonical form` (ame-flutter) — PASSED (NOT REAL)
+- Status: **NOT REAL — verified in WP#7 Phase C**
+- Evidence: All three audit tests PASSED on first run, pre-fix. Direct CLI verification confirms:
+  - `dart run bin/ame_conformance_cli.dart` on `root = chart(bar, values=[1, 2, 3])` emits `{"_type":"chart","type":"bar","values":[1.0,2.0,3.0]}` (byte-identical to Kotlin canonical form).
+  - `dart run bin/ame_conformance_cli.dart` on `root = progress(1.0, "Done")` emits `{"_type":"progress","label":"Done","value":1.0}` (preserves `.0`).
+  - Conclusion: Dart's `jsonEncode` preserves `.0` for whole-number `double` values via `num.toString()` semantics — unlike Swift Foundation's `JSONEncoder`. The audit suspicion (motivated by Swift Bug 21) does not transfer to Dart.
+- Conformance impact: **none** — Flutter already produces byte-equal canonical Doubles.
+- Notes: This entry permanently documents that the WP#7 audit identified a phantom Flutter-equivalent bug. The audit suspicion was wrong; the canonical record prevents the same false claim from being acted on again. The 3 verifying tests are retained as permanent phantom guards against future regression that would introduce double normalization (e.g., a switch to a custom encoder that drops the `.0`). No `_PreservedDouble` wrapper or custom encoder is required for v1.3.
+
+## Bug 30: Flutter Callout AST does not carry the spec-promised `color` field
+
+- Audit claim severity: HIGH
+- Verified severity: HIGH
+- Platforms: Flutter (ame-flutter)
+- Verifying tests:
+  - `audited_bug_regression_test.dart::callout accepts color parameter` (ame-flutter)
+- Status: **REAL — FIXED in v1.3 (commit pending)**
+- Evidence: pre-fix `parse('root = callout(info, "msg", color=success)')` produced JSON `{"_type":"callout","content":"msg","type":"info"}` with no `color` key (captured in WP#7 Phase B failing test output). Fixed in WP#7 by adding `final SemanticColor? color` as the last positional field of `AmeCallout`, wiring `_buildCallout` through `_resolveSemanticColorArg(named['color'])`, and threading the field through `_resolveTree`'s Callout branch so it survives data-binding resolution. Audit test now passes; conformance fixture `56-callout-with-color.expected.json` is byte-equal for Flutter.
+- Conformance impact: **none** in practice — the new `color` field is omitted from JSON when null (matches `encodeDefaults = false` in Kotlin). Verified by all 57 conformance fixtures still passing for Flutter post-fix.
+- Notes: Flutter analog of v1.2 Bug 6.
+
+## Bug 31: Flutter chart series does not support an array of `$path` refs
+
+- Audit claim severity: HIGH
+- Verified severity: HIGH
+- Platforms: Flutter (ame-flutter)
+- Verifying tests:
+  - `audited_bug_regression_test.dart::chart series array of path refs` (ame-flutter)
+  - `audited_bug_regression_test.dart::chart series array of paths allows mismatched lengths` (ame-flutter, deeper coverage mirroring Kotlin Bug 7b)
+- Status: **REAL — FIXED in v1.3 (commit pending)**
+- Evidence: pre-fix `chart(line, series=[$a, $b])` resolved with `series=null` because the parser had no array-of-DataRefs detection (captured in WP#7 Phase B failing test: `Expected: <2> Actual: <0>`). Fixed in WP#7 by adding `final List<String>? seriesPaths` to `AmeChart` parallel to `seriesPath`, extending `_buildChart` series detection (if every `_PvArr` item parses as `_PvDataRef`, store paths in `seriesPaths`; otherwise fall through to literal nested-numeric-array handling), and extending `_resolveTree`'s Chart branch with all-or-nothing resolution: every path must resolve, otherwise `series` stays null so the renderer shows the empty state. Both audit tests pass; conformance fixture `57-chart-series-array-of-paths.expected.json` is byte-equal for Flutter.
+- Conformance impact: **none** in practice — the new `seriesPaths` field is cleared by `_resolveTree` before serialization (only resolved `series` ever appears in JSON). Verified by all 57 conformance fixtures still passing for Flutter post-fix.
+- Notes: Flutter analog of v1.2 Bug 7. Mirrors Kotlin `paths.mapNotNull { ... }.takeIf { it.size == paths.size }` all-or-nothing pattern.
+
+## Bug 32: Flutter streaming `parseLine()` does not apply `---` + JSON data section
+
+- Audit claim severity: HIGH
+- Verified severity: HIGH
+- Platforms: Flutter (ame-flutter)
+- Verifying tests:
+  - `audited_bug_regression_test.dart::streaming mode applies data section` (ame-flutter)
+  - `audited_bug_regression_test.dart::streaming mode handles chunked json` (ame-flutter, deeper coverage mirroring Kotlin Bug 8b)
+- Status: **REAL — FIXED in v1.3 (commit pending)**
+- Evidence: pre-fix streaming `---` + `{"greeting":"hello"}` + `root = txt($greeting)` resolved to `text == "$greeting"` (unresolved) because `parseLine("---")` returned null and the JSON lines were never accumulated (captured in WP#7 Phase B failing test: `Expected: 'hello' Actual: '$greeting'`). Fixed in WP#7 by adding three streaming-mode fields to `AmeParser` (`_streamingDataMode`, `_streamingDataBuffer`, `_streamingDataApplied`), implementing the Kotlin letter-prefixed line disambiguation in `parseLine` (AME identifiers required to start with a letter; non-letter-prefix → JSON content accumulates into buffer), and finalizing the buffer at `getResolvedTree()` with idempotence guard plus `_dataModel == null` mixed-mode safety. `reset()` clears all three fields. Both audit tests pass.
+- Conformance impact: **none** — resolved trees serialize the same way regardless of which API ingested them.
+- Notes: Flutter analog of v1.2 Bug 8. The batch `parse()` flow remains unchanged because it manages its own `dataLines` accumulator and never calls `parseLine("---")`.
+
+## Bug 33: Flutter `AmeFormState.collectValues` silently merges input/toggle id collisions
+
+- Audit claim severity: MEDIUM
+- Verified severity: MEDIUM
+- Platforms: Flutter (ame-flutter-ui)
+- Verifying tests:
+  - `audited_form_state_test.dart::input toggle id collision detected` (ame-flutter-ui, behavioral)
+  - `audited_form_state_test.dart::warnings cleared between collect calls` (ame-flutter-ui, idempotence guard)
+  - `audited_form_state_test.dart::distinct ids do not produce collision warning` (ame-flutter-ui, false-positive guard)
+  - `audited_ui_bug_regression_test.dart::AmeFormState exposes a warnings field` (ame-flutter-ui, source-structural sentinel)
+- Status: **REAL — FIXED in v1.3 (commit pending)**
+- Evidence: pre-fix `collectValues` silently overwrote input values with toggle values for colliding IDs and exposed no diagnostic. Fixed in WP#7 by adding a private `_collisionWarnings` list and public `warnings` getter on `AmeFormState`. `collectValues` now clears `_collisionWarnings` first, walks input keys ∩ toggle keys, and appends a per-id collision message matching the Kotlin/Swift Bug 12 text exactly: `"Form field id collision: '$id' is registered as both input and toggle; toggle value used."`. Merge order is preserved (toggle wins) per the WP#4 Bug 5 contract. All 4 verifying tests pass.
+- Conformance impact: **none** — form state is not serialized.
+- Notes: Flutter analog of v1.2 Bug 12. Behavioral collision tests live in a dedicated file `audited_form_state_test.dart` because Bug 33's pre-fix state had no `warnings` getter to reference; the source-structural sentinel in `audited_ui_bug_regression_test.dart` carries the always-compiles failing-test signal.
+
+## Bug 34: Flutter input-ref regex `\w+` rejects hyphenated field IDs
+
+- Audit claim severity: MEDIUM
+- Verified severity: MEDIUM
+- Platforms: Flutter (ame-flutter-ui)
+- Verifying tests:
+  - `audited_ui_bug_regression_test.dart::input ref regex accepts hyphenated ids` (ame-flutter-ui)
+  - `audited_ui_bug_regression_test.dart::input ref regex rejects dot inside field id` (ame-flutter-ui, Q4 permanent guard mirroring Compose/SwiftUI WP#5 hardening)
+- Status: **REAL — FIXED in v1.3 (commit pending)**
+- Evidence: pre-fix `state.resolveInputReferences({'query': 'Hello, ${input.user-name}'})` left the token unsubstituted because `\w+` excludes `-` (captured in WP#7 Phase B failing test). Fixed in WP#7 by changing the pattern to `r'\$\{input\.([a-zA-Z0-9_-]+)\}'` — hyphen at end of class to avoid range parsing. The literal `.` separator inside the curly braces remains a hard separator (Q4 guard test passes both pre- and post-fix). Both verifying tests pass.
+- Conformance impact: **none** — form state is not serialized.
+- Notes: Flutter analog of v1.2 Bug 13.
+
+## Bug 35: Flutter `AmeSerializer.fromJson` swallows decode failures into `null`
+
+- Audit claim severity: MEDIUM
+- Verified severity: MEDIUM
+- Platforms: Flutter (ame-flutter)
+- Verifying tests:
+  - `audited_bug_regression_test.dart::serializer returns distinguishable error on invalid json` (ame-flutter, mirror-based existence check)
+- Status: **REAL — FIXED in v1.3 (commit pending)**
+- Evidence: pre-fix `AmeSerializer` exposed only nullable `fromJson` and `actionFromJson` that swallowed every failure into `null`. The mirror-based audit test (analog of Kotlin reflection Bug 15 test) confirmed no diagnostic API existed. Fixed in WP#7 by adding sealed `AmeDecodeResult` class with `AmeDecodeSuccess(node)` and `AmeDecodeFailure(message, cause)` variants (idiomatic Dart 3 sealed class, no new dependency), plus symmetric `AmeActionDecodeResult` for actions. New `fromJsonOrError` / `actionFromJsonOrError` static methods classify failures into FormatException (invalid JSON), TypeError (schema mismatch), root-not-object, unknown `_type`, and unexpected runtime errors. Legacy nullable APIs now delegate to the new diagnostic versions for single-source-of-truth back-compat. The mirror existence check passes; the JSON output for valid input is byte-identical to pre-fix.
+- Conformance impact: **none** — improves diagnostics only; existing `fromJson(String)?` API unchanged.
+- Notes: Flutter analog of v1.2 Bug 15. Recommended Q2 design from the WP#7 brief was followed: sealed class instead of `dartz`/`fpdart` Either to avoid a new dependency.
+
+## Bug 36: Flutter accordion `expanded` parameter not reactive to node updates
+
+- Audit claim severity: MEDIUM
+- Verified severity: MEDIUM
+- Platforms: Flutter (ame-flutter-ui)
+- Verifying tests:
+  - `audited_ui_bug_regression_test.dart::accordion follows external expanded changes` (ame-flutter-ui, behavioral via `pumpWidget` + finder)
+- Status: **REAL — FIXED in v1.3 (commit pending)**
+- Evidence: pre-fix `pumpWidget(...expanded: true)` after an initial `expanded: false` render did NOT reveal the child because `_isExpanded` was captured once in `initState` (captured in WP#7 Phase B failing test). Fixed in WP#7 by adding `didUpdateWidget(covariant _AmeAccordionWidget oldWidget)` to `_AmeAccordionWidgetState` that detects `widget.node.expanded != oldWidget.node.expanded` (with an additional `widget.node.expanded != _isExpanded` guard so a local user toggle followed by an unchanged-from-initial server prop doesn't snap back), then `setState`s `_isExpanded` and animates the chevron. Mirrors Compose `LaunchedEffect(node.expanded)` reactivity. Audit test passes.
+- Conformance impact: **none** — UI state, not serialized.
+- Notes: Flutter analog of v1.2 Bug 18.
+
+## Bug 37: Flutter theme uses hardcoded light-theme colors, breaks dark mode
+
+- Audit claim severity: MEDIUM
+- Verified severity: MEDIUM
+- Platforms: Flutter (ame-flutter-ui)
+- Verifying tests:
+  - `audited_ui_bug_regression_test.dart::theme colors respect dark mode` (ame-flutter-ui, behavioral via `MaterialApp` + `ThemeData(brightness:)` swap)
+- Status: **REAL — FIXED in v1.3 (commit pending)** (via Path D)
+- Evidence: pre-fix `AmeTheme.semanticColor(success)` returned `Color(0xFF4CAF50)` regardless of theme brightness (captured in WP#7 Phase B failing test). Fixed in WP#7 mirroring Compose Path D: `_isDark(context) => Theme.of(context).brightness == Brightness.dark` branching with exact Material 3 hex values — Green 700 (`0xFF388E3C`) light / Green 300 (`0xFF81C784`) dark, Orange 700 (`0xFFF57C00`) light / Orange 300 (`0xFFFFB74D`) dark — applied to `badgeColor`, `semanticColor`, and `calloutStyle` (warning/success/tip backgrounds). Callout container hex pairs are also lifted verbatim from `AmeTheme.kt::defaultCalloutStyle`. Audit test passes; the test setup uses an empty-pump-between-pumps workaround documented inline because Flutter's `pumpWidget` reuses the existing element tree when the root widget type matches.
+- Conformance impact: **none** — theme is not serialized.
+- Notes: Flutter analog of v1.2 Bug 14. Bug 25 (deferred to v1.4) remains the proper `AmeThemeConfig` role-family extension across all three runtimes.
+
+## Bug 38: Flutter date/time picker subwidgets allocate `TextEditingController` inside `build()`
+
+- Audit claim severity: MEDIUM (architectural)
+- Verified severity: MEDIUM (architectural — focus loss + GC churn confirmed by source review; full IME-composition damage requires platform run)
+- Platforms: Flutter (ame-flutter-ui)
+- Verifying tests:
+  - `audited_ui_bug_regression_test.dart::date and time picker subwidgets hoist controllers via StatefulWidget` (ame-flutter-ui, source-structural)
+- Status: **REAL — FIXED in v1.3 (commit pending)**
+- Evidence: WP#7 Phase D discovery. Pre-fix `_AmeInputDatePicker` and `_AmeInputTimePicker` constructed a fresh `TextEditingController(text: ...)` inside `build()` on every rebuild — confirmed by grep at the source line numbers cited in the original audit entry. Fixed in WP#7 by converting both subwidgets to `StatefulWidget` with paired `_AmeInputDatePickerState` / `_AmeInputTimePickerState` classes that allocate the controller in `initState`, dispose in `dispose`, and synchronize the controller text via a `formState.addListener(_syncFromFormState)` plus `didUpdateWidget` for the rare host-swap case. The pattern mirrors `_AmeInputTextField` which already followed the correct lifecycle. Audit source-structural test passes.
+- Conformance impact: **none** — pure renderer bug; no JSON output change.
+- Notes: Flutter-specific architectural finding from WP#7 Phase D discovery (no Kotlin/Swift analog because Compose `OutlinedTextField` and SwiftUI `TextField` manage their own controller equivalents).
+
+---
+
 ## Phase 2 fix order (driven by verified severity)
 
 When fixes begin (per `regression-protocol.md` §7 Kotlin-first), address bugs
@@ -822,6 +1002,7 @@ in this order:
 
 1. **CRITICAL**
    - ~~Bug 3 — paren/bracket-in-string corruption (parser, both runtimes)~~ — **FIXED in v1.2 WP#1**
+   - ~~Bug 26 — Flutter paren/bracket-in-string corruption (parser, ame-flutter)~~ — **FIXED in v1.3 WP#7**
 2. **HIGH**
    - ~~Bug 1 — Swift chart labels (Swift only)~~ — **FIXED in v1.2 WP#4**
    - ~~Bug 2 — Swift carousel peek (Swift only)~~ — **FIXED in v1.2 WP#4**
@@ -832,22 +1013,35 @@ in this order:
    - ~~Bug 8 — streaming + data section (both runtimes)~~ — **FIXED in v1.2 WP#3**
    - ~~Bug 11 — ref cycle stack overflow (both runtimes)~~ — **FIXED in v1.2 WP#3**
    - ~~Bug 21 — Swift Foundation strips `.0` from whole-number Doubles (Swift only)~~ — **FIXED in v1.2 WP#2**
+   - ~~Bug 27 — Flutter ref cycle stack overflow (ame-flutter)~~ — **FIXED in v1.3 WP#7**
+   - ~~Bug 28 — Flutter chart math (ame-flutter-ui; ChartMath top-level @visibleForTesting class + sign-aware bar/line + line empty-state + multi-series shared X)~~ — **FIXED in v1.3 WP#7**
+   - ~~Bug 30 — Flutter callout color field (ame-flutter)~~ — **FIXED in v1.3 WP#7**
+   - ~~Bug 31 — Flutter chart series array-of-paths (ame-flutter)~~ — **FIXED in v1.3 WP#7**
+   - ~~Bug 32 — Flutter streaming + data section (ame-flutter)~~ — **FIXED in v1.3 WP#7**
 3. **MEDIUM**
    - ~~Bug 9 — reserved enum keywords (both runtimes)~~ — **FIXED in v1.2 WP#3 via spec correction (Path D)**
    - ~~Bug 12 — input/toggle id collision (both runtimes; warnings diagnostic surface, merge order preserved per WP#4 Bug 5 contract)~~ — **FIXED in v1.2 WP#5**
    - ~~Bug 13 — input ref regex hyphens (both runtimes; Q4 dot-separator guard added in both)~~ — **FIXED in v1.2 WP#5**
-   - ~~Bug 14 — theme dark-mode adaptation (both runtimes; Path D — `isSystemInDarkTheme()` in Compose, `Color(.systemGreen)` etc. in SwiftUI; Bug 25 filed for v1.3 role-family extension)~~ — **FIXED in v1.2 WP#5**
+   - ~~Bug 14 — theme dark-mode adaptation (both runtimes; Path D — `isSystemInDarkTheme()` in Compose, `Color(.systemGreen)` etc. in SwiftUI; Bug 25 filed for v1.4 role-family extension)~~ — **FIXED in v1.2 WP#5**
    - ~~Bug 15 — serializer error diagnostics (both runtimes; `fromJsonOrError` and `actionFromJsonOrError` returning `Result`)~~ — **FIXED in v1.2 WP#5**
    - ~~Bug 18 — accordion expanded reactivity (both runtimes; mirrors WP#4 Bug 5 separate-state pattern via `LaunchedEffect` / `.onChange(of:)`; spec accordion `expanded` row updated)~~ — **FIXED in v1.2 WP#5**
+   - ~~Bug 33 — Flutter input/toggle id collision (ame-flutter-ui; warnings diagnostic surface)~~ — **FIXED in v1.3 WP#7**
+   - ~~Bug 34 — Flutter input ref regex hyphens (ame-flutter-ui; Q4 dot-separator guard)~~ — **FIXED in v1.3 WP#7**
+   - ~~Bug 35 — Flutter serializer error diagnostics (ame-flutter; sealed AmeDecodeResult + `fromJsonOrError` / `actionFromJsonOrError`)~~ — **FIXED in v1.3 WP#7**
+   - ~~Bug 36 — Flutter accordion expanded reactivity (ame-flutter-ui; `didUpdateWidget` syncs `_isExpanded` + chevron animation)~~ — **FIXED in v1.3 WP#7**
+   - ~~Bug 37 — Flutter theme dark-mode adaptation (ame-flutter-ui; Path D mirroring Compose Material 3 hex values)~~ — **FIXED in v1.3 WP#7**
+   - ~~Bug 38 — Flutter date/time picker controller hoisting (ame-flutter-ui; StatefulWidget + initState/dispose + formState listener)~~ — **FIXED in v1.3 WP#7**
 4. **LOW**
    - ~~Bug 10 — chart color default documentation drift (spec or AST)~~ — **FIXED in v1.2 WP#2**
 5. **TOOLING**
    - ~~Bug 16 — `check-parity.sh` script (Phase 5)~~ — **FIXED in v1.2 WP#6 via multi-runtime `RUNTIMES` array refactor; runtimes invoke independently per fixture; Bug 16 fix verified by deliberately removing Kotlin CLI and confirming Swift column still ran**
+   - ~~Activate Flutter row in `conformance/check-parity.sh` and delete legacy `flutter-check-parity.sh`~~ — **FIXED in v1.3 WP#7**
 
 ## NOT REAL (phantom claims)
 
 - Bug 17 — Compose `items` import (refuted by Robolectric compile + render test)
 - Bug 19 — Kotlin chart-in-each() scope (refuted by existing test + new guard test)
+- Bug 29 — Flutter Dart Double serialization (refuted in WP#7 Phase C — Dart's `jsonEncode` preserves `.0` natively for whole-number `double` values via `num.toString()` semantics; the Swift Bug 21 root-cause class does not transfer to Dart; 3 verifying tests retained as permanent phantom guards against future regression)
 
 ## Deferred to v1.3 (newly discovered during v1.2 fix sprint)
 
