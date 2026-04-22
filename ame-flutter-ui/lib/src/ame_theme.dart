@@ -27,31 +27,23 @@ class TimelineStyle {
 
 /// Maps AME enum values to Material 3 styles.
 ///
-/// All mappings follow primitives.md Compose Mapping tables and match
-/// the Kotlin [AmeTheme] defaults exactly. Uses [BuildContext] to access
+/// All mappings follow primitives.md tables. Uses [BuildContext] to access
 /// the current [ThemeData] and [ColorScheme].
 ///
-/// Bug 37 fix (Flutter analog of v1.2 Bug 14, Path D): SUCCESS and
-/// WARNING semantic tokens (and the warning/success/tip callout styles)
-/// branch on `Theme.of(context).brightness == Brightness.dark` using
-/// documented Material green and orange swatches: 700 (richer, higher
-/// contrast) for light mode and 300 (lighter, lower saturation) for
-/// dark mode. Mirrors Compose `defaultBadgeColor` and
-/// `defaultSemanticColor` lines 119-133, 228-234. See Bug 25 in
-/// `AUDIT_VERDICTS.md` for the deferred AmeThemeConfig role-family
-/// extension that is the v1.4 redesign target.
+/// SUCCESS and WARNING semantic tokens (and the warning/success/tip callout
+/// styles) branch on brightness using documented Material green and orange
+/// swatches: 700 (richer, higher contrast) for light mode and 300 (lighter,
+/// lower saturation) for dark mode.
 class AmeTheme {
   AmeTheme._();
 
-  // Material 3 Green / Orange palette anchors used by the Path D fix.
-  // Keep in sync with `ame-compose/.../AmeTheme.kt`.
+  // Material 3 Green / Orange palette anchors.
   static const Color _successLight = Color(0xFF388E3C); // Green 700
   static const Color _successDark = Color(0xFF81C784); // Green 300
   static const Color _warningLight = Color(0xFFF57C00); // Orange 700
   static const Color _warningDark = Color(0xFFFFB74D); // Orange 300
 
-  // Callout container/tint pairs (light / dark) lifted verbatim from
-  // `ame-compose/.../AmeTheme.kt::defaultCalloutStyle` lines 163-189.
+  // Callout container/tint pairs (light / dark).
   static const Color _calloutWarningBgLight = Color(0xFFFFF3E0);
   static const Color _calloutWarningBgDark = Color(0xFF3E2D1E);
   static const Color _calloutSuccessBgLight = Color(0xFFE8F5E9);

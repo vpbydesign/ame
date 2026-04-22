@@ -22,10 +22,9 @@ class AmeFormState {
 
     /**
      * Diagnostic surface populated by [collectValues] when an input id and
-     * a toggle id collide (Bug #12). Soft-warn only: the merge order is
-     * preserved (toggle wins) so that the input/toggle contract documented
-     * in WP#4 Bug 5 stays stable; this list lets hosts detect the
-     * data-loss class instead of silently shipping bad form payloads.
+     * a toggle id collide. Soft-warn only: the merge order is preserved
+     * (toggle wins); this list lets hosts detect the data-loss class
+     * instead of silently shipping bad form payloads.
      *
      * Cleared and recomputed on every [collectValues] call so the warnings
      * always reflect the current registration set.
@@ -70,10 +69,9 @@ class AmeFormState {
      * Collects all current form values into a flat map.
      *
      * Merge order: inputs first, then toggles. When the same id appears in
-     * both maps the toggle value wins, matching the contract documented in
-     * WP#4 Bug 5. Bug #12 adds visibility: every collision is recorded in
-     * [warnings] so hosts can detect the silent-data-loss class without
-     * changing the merge behavior.
+     * both maps the toggle value wins. Every collision is recorded in
+     * [warnings] so hosts can detect the data-loss class without changing
+     * the merge behavior.
      *
      * Input values are included as-is. Toggle boolean values are
      * converted to `"true"` or `"false"` strings.
@@ -118,7 +116,7 @@ class AmeFormState {
     }
 
     companion object {
-        // Bug #13: the original `\w+` excluded `-`, so `${input.user-name}`
+        // The original `\w+` excluded `-`, so `${input.user-name}`
         // was silently left unsubstituted. The character class below accepts
         // letters, digits, underscores, and hyphens. The hyphen is placed at
         // the end of the class to avoid being parsed as a range. The literal

@@ -1,0 +1,6 @@
+// conformance/59-list-item-action-trailing.ame
+// Tests: list_item NORMATIVE nested click target rule (§list_item).
+// The row has its own tap action AND a trailing btn with its own action.
+// The renderer MUST isolate the trailing tap so it does not also fire the
+// row action.
+root = list_item("Pizza Place", "71 Mulberry St", icon("restaurant"), btn("Directions", nav("/dir")), action=nav("/detail"))

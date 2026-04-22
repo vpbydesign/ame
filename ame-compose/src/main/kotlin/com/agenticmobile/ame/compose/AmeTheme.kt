@@ -116,12 +116,11 @@ internal fun defaultTextStyle(style: TxtStyle): TextStyle = when (style) {
  * Maps [BadgeVariant] enum values to background [Color] objects.
  * Mappings follow primitives.md § badge Compose Mapping.
  *
- * Bug #14 (WP#5, Path D): SUCCESS and WARNING tokens are mode-aware.
- * Material 3's standard ColorScheme has no built-in success/warning roles,
- * so AME branches on [isSystemInDarkTheme] using documented Material green
- * and orange swatches: 700 (richer, higher contrast) for light mode and
- * 300 (lighter, lower saturation) for dark mode. See Bug 25 (deferred to
- * v1.3) for the proper AmeThemeConfig role-family extension.
+ * SUCCESS and WARNING tokens are mode-aware. Material 3's standard
+ * ColorScheme has no built-in success/warning roles, so AME branches on
+ * [isSystemInDarkTheme] using documented Material green and orange swatches:
+ * 700 (richer, higher contrast) for light mode and 300 (lighter, lower
+ * saturation) for dark mode.
  */
 @Composable
 internal fun defaultBadgeColor(variant: BadgeVariant): Color = when (variant) {
@@ -153,12 +152,11 @@ internal fun defaultBtnColors(style: BtnStyle): ButtonColors = when (style) {
 /**
  * Maps [CalloutType] to a composite [CalloutStyle] with background, icon, and tint.
  *
- * Bug #14 (WP#5, Path D): WARNING / SUCCESS / TIP are mode-aware. Light
- * mode uses the Material 3 700-weight tints with their canonical pastel
- * containers; dark mode uses the Material 3 300-weight tints with desaturated
- * deep-tone containers tuned for legibility on Material 3 dark surfaces.
- * INFO and ERROR continue to derive from MaterialTheme.colorScheme so they
- * inherit the host's dynamic palette unchanged.
+ * WARNING / SUCCESS / TIP are mode-aware. Light mode uses the Material 3
+ * 700-weight tints with their canonical pastel containers; dark mode uses the
+ * Material 3 300-weight tints with desaturated deep-tone containers tuned for
+ * legibility on dark surfaces. INFO and ERROR derive from
+ * MaterialTheme.colorScheme so they inherit the host's dynamic palette.
  */
 @Composable
 internal fun defaultCalloutStyle(type: CalloutType): CalloutStyle = when (type) {
@@ -220,10 +218,10 @@ internal fun defaultTimelineStyle(status: TimelineStatus): TimelineStyle = when 
 /**
  * Maps [SemanticColor] to Material 3 [Color] objects.
  *
- * Bug #14 (WP#5, Path D): SUCCESS and WARNING are mode-aware via
- * [isSystemInDarkTheme] using the same Material 700/300 swatches as
- * [defaultBadgeColor] for cross-primitive consistency. PRIMARY, SECONDARY,
- * and ERROR continue to derive from the host's MaterialTheme.colorScheme.
+ * SUCCESS and WARNING are mode-aware via [isSystemInDarkTheme] using the
+ * same Material 700/300 swatches as [defaultBadgeColor] for cross-primitive
+ * consistency. PRIMARY, SECONDARY, and ERROR derive from
+ * MaterialTheme.colorScheme.
  */
 @Composable
 internal fun defaultSemanticColor(color: SemanticColor): Color = when (color) {

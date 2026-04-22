@@ -762,4 +762,111 @@ class AmeNodeTest {
         )
         assertRoundTrip(tree)
     }
+
+    // ── v1.4 Row weights / crossAlign ─────────────────────────────────
+
+    @Test
+    fun roundTripRowWithWeights() {
+        val node = AmeNode.Row(
+            children = listOf(AmeNode.Txt("Wide"), AmeNode.Txt("Narrow")),
+            weights = listOf(1, 0)
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripRowWithCrossAlign() {
+        val node = AmeNode.Row(
+            children = listOf(AmeNode.Txt("A"), AmeNode.Txt("B")),
+            crossAlign = Align.TOP
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripRowWithWeightsAndCrossAlign() {
+        val node = AmeNode.Row(
+            children = listOf(AmeNode.Txt("A"), AmeNode.Txt("B")),
+            align = Align.SPACE_BETWEEN,
+            gap = 12,
+            weights = listOf(1, 1),
+            crossAlign = Align.BOTTOM
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripRowDefaultsOmitsNewFields() {
+        // v1.3 conformance preservation: a Row with only children (no weights,
+        // no crossAlign) must serialize byte-identically to v1.3 output.
+        val node = AmeNode.Row(children = listOf(AmeNode.Txt("Item")))
+        assertRoundTrip(node)
+        val json = AmeSerializer.toJson(node)
+        assertTrue(!json.contains("weights"), "Default weights must not be encoded: $json")
+        assertTrue(!json.contains("cross_align"), "Default cross_align must not be encoded: $json")
+    }
+
+    @Test
+    fun rowCrossAlignSerializesAsSnakeCase() {
+        val node = AmeNode.Row(
+            children = listOf(AmeNode.Txt("A")),
+            crossAlign = Align.TOP
+        )
+        val json = AmeSerializer.toJson(node)
+        assertTrue(json.contains("\"cross_align\""), "crossAlign must serialize as snake_case: $json")
+        assertTrue(!json.contains("\"crossAlign\""), "camelCase must not appear in JSON: $json")
+    }
+
+    // ── v1.4 list_item primitive ───────────────────────────────────────
+
+    @Test
+    fun roundTripListItemFull() {
+        val node = AmeNode.ListItem(
+            title = "Pizza Place",
+            subtitle = "71 Mulberry St",
+            leading = AmeNode.Icon("restaurant"),
+            trailing = AmeNode.Badge("4.5", BadgeVariant.INFO),
+            action = AmeAction.Navigate("/detail")
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripListItemMinimal() {
+        val node = AmeNode.ListItem(title = "Title only")
+        assertRoundTrip(node)
+        val json = AmeSerializer.toJson(node)
+        assertTrue(!json.contains("subtitle"), "Default subtitle must not be encoded: $json")
+        assertTrue(!json.contains("leading"), "Default leading must not be encoded: $json")
+        assertTrue(!json.contains("trailing"), "Default trailing must not be encoded: $json")
+        assertTrue(!json.contains("action"), "Default action must not be encoded: $json")
+    }
+
+    @Test
+    fun roundTripListItemNestedClickTargetCase() {
+        // The NORMATIVE nested click target case (§list_item): row-level action
+        // PLUS a trailing Btn with its own action. Both actions must survive
+        // round-trip independently.
+        val node = AmeNode.ListItem(
+            title = "Pizza Place",
+            subtitle = "71 Mulberry St",
+            leading = AmeNode.Icon("restaurant"),
+            trailing = AmeNode.Btn("Directions", AmeAction.Navigate("/dir")),
+            action = AmeAction.Navigate("/detail")
+        )
+        assertRoundTrip(node)
+    }
+
+    @Test
+    fun roundTripAlignTopBottom() {
+        // v1.4 added TOP and BOTTOM to the Align enum. Verify both serialize
+        // and deserialize correctly via a Row.crossAlign carrier.
+        for (align in listOf(Align.TOP, Align.BOTTOM)) {
+            val node = AmeNode.Row(
+                children = listOf(AmeNode.Txt("X")),
+                crossAlign = align
+            )
+            assertRoundTrip(node)
+        }
+    }
 }

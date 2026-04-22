@@ -1,0 +1,10 @@
+// conformance/61-row-cross-align.ame
+// Tests: row crossAlign=top — leading icon aligns with the first
+// line of an adjacent multi-line text column. JSON wire format uses
+// snake_case `cross_align`; AME source accepts both `crossAlign=` and
+// `cross_align=` for LLM leniency.
+root = row([leading_icon, info_col], crossAlign=top)
+leading_icon = icon("restaurant", 24)
+info_col = col([place_name, place_addr])
+place_name = txt("Pizza Place", title)
+place_addr = txt("71 Mulberry St", caption)

@@ -7,9 +7,9 @@ class AmeKeywords {
 
   static const standardPrimitives = <String>{
     'col', 'row', 'txt', 'btn', 'card', 'badge', 'icon', 'img',
-    'input', 'toggle', 'list', 'table', 'divider', 'spacer', 'progress',
-    'chart', 'code', 'accordion', 'carousel', 'callout', 'timeline',
-    'timeline_item',
+    'input', 'toggle', 'list', 'list_item', 'table', 'divider', 'spacer',
+    'progress', 'chart', 'code', 'accordion', 'carousel', 'callout',
+    'timeline', 'timeline_item',
   };
 
   static const actionNames = <String>{

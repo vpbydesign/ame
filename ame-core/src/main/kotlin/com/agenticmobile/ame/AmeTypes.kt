@@ -6,7 +6,8 @@ import kotlinx.serialization.Serializable
 /**
  * Horizontal/vertical alignment for layout primitives.
  * col supports: start, center, end
- * row supports: start, center, end, space_between, space_around
+ * row main-axis (align): start, center, end, space_between, space_around
+ * row cross-axis (crossAlign): top, center, bottom
  */
 @Serializable
 enum class Align {
@@ -14,7 +15,9 @@ enum class Align {
     @SerialName("center") CENTER,
     @SerialName("end") END,
     @SerialName("space_between") SPACE_BETWEEN,
-    @SerialName("space_around") SPACE_AROUND
+    @SerialName("space_around") SPACE_AROUND,
+    @SerialName("top") TOP,
+    @SerialName("bottom") BOTTOM
 }
 
 /** Typographic style for txt primitive. */
@@ -107,8 +110,9 @@ enum class SemanticColor {
 object AmeKeywords {
     val STANDARD_PRIMITIVES: Set<String> = setOf(
         "col", "row", "txt", "btn", "card", "badge", "icon", "img",
-        "input", "toggle", "list", "table", "divider", "spacer", "progress",
-        "chart", "code", "accordion", "carousel", "callout", "timeline", "timeline_item"
+        "input", "toggle", "list", "list_item", "table", "divider", "spacer",
+        "progress", "chart", "code", "accordion", "carousel", "callout",
+        "timeline", "timeline_item"
     )
 
     val ACTION_NAMES: Set<String> = setOf("tool", "uri", "nav", "copy", "submit")
@@ -124,11 +128,8 @@ object AmeKeywords {
      * standard primitive names, action names, structural keywords (`each`,
      * `root`), or boolean literals.
      *
-     * Note (v1.2 / Bug 9): enum-value tokens (`title`, `primary`, `done`, etc.)
-     * are NOT reserved and MAY be used as user-defined identifiers. The parser
-     * disambiguates by argument position. See `specification/v1.0/syntax.md`
-     * Reserved Keywords section for the canonical list and the rationale for
-     * NOT reserving enum-value tokens.
+     * Enum-value tokens (`title`, `primary`, `done`, etc.) are intentionally
+     * NOT reserved; the parser disambiguates by argument position per syntax.md.
      */
     fun isReserved(identifier: String): Boolean =
         identifier in STANDARD_PRIMITIVES ||

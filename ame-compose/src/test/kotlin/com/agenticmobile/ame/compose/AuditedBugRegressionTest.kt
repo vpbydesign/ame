@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.performClick
 import com.agenticmobile.ame.AmeAction
 import com.agenticmobile.ame.AmeNode
 import com.agenticmobile.ame.CalloutType
@@ -544,5 +545,233 @@ class AuditedBugRegressionTest {
         // BUG #18: this assertion fails today because the renderer captured
         // expanded=false in remember{} and ignores the new node.expanded=true.
         composeTestRule.onNodeWithText("inner content").assertIsDisplayed()
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Bug 39 — DataList items had zero vertical rhythm (v1.4)
+    // ════════════════════════════════════════════════════════════════════
+
+    /**
+     * Audit Bug #39: AmeRenderer.kt AmeDataList previously used a bare
+     * `Column` with no vertical arrangement. List items were flush against
+     * each other and dividers had no visual breathing room.
+     *
+     * Spec section: specification/v1.0/primitives.md (list)
+     * Audit reference: AUDIT_VERDICTS.md#bug-39
+     * Pre-fix expected: FAIL — AmeRenderer.kt source has no
+     *   `verticalArrangement = Arrangement.spacedBy` inside AmeDataList.
+     * Post-fix expected: PASS — source contains the dividers-conditional
+     *   8dp/12dp spacing.
+     */
+    @Test
+    fun testDataListHasVerticalSpacing() {
+        val source = readRendererSource()
+        val dataListBlock = extractFunctionBody(source, "AmeDataList")
+        assertTrue(
+            dataListBlock.contains("Arrangement.spacedBy") &&
+                dataListBlock.contains("node.dividers"),
+            "BUG #39: AmeDataList must use Arrangement.spacedBy with a " +
+                "dividers-conditional spacing. Source did not contain the " +
+                "expected pattern."
+        )
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Bug 40 — Carousel items grow beyond comfortable widths on tablets (v1.4)
+    // ════════════════════════════════════════════════════════════════════
+
+    /**
+     * Audit Bug #40: on Pixel Fold and other large form factors, the
+     * `fillParentMaxWidth(0.85f)` produced cards wider than 400dp, which
+     * looked unbalanced. v1.4 clamps each carousel item to a 340dp max,
+     * matching Material 3's recommended max card width.
+     *
+     * Spec section: specification/v1.0/primitives.md (carousel)
+     * Audit reference: AUDIT_VERDICTS.md#bug-40
+     * Pre-fix expected: FAIL — AmeCarousel item modifier is
+     *   `Modifier.fillParentMaxWidth(0.85f)` only.
+     * Post-fix expected: PASS — modifier chains `.widthIn(max = 340.dp)`.
+     */
+    @Test
+    fun testCarouselItemHasMaxWidthClamp() {
+        val source = readRendererSource()
+        val carouselBlock = extractFunctionBody(source, "AmeCarousel")
+        assertTrue(
+            carouselBlock.contains("widthIn(max = 340.dp)"),
+            "BUG #40: AmeCarousel items must clamp width via " +
+                "Modifier.widthIn(max = 340.dp). Source did not contain the pattern."
+        )
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Bug 41a — Badge variant not announced by screen readers (v1.4)
+    // ════════════════════════════════════════════════════════════════════
+
+    /**
+     * Audit Bug #41a: AmeBadge previously had no semantics modifier, so
+     * TalkBack read only the label ("4.5") with no indication that the
+     * element was a status indicator with semantic color meaning.
+     *
+     * Spec section: specification/v1.0/primitives.md (badge accessibility)
+     * Audit reference: AUDIT_VERDICTS.md#bug-41a
+     * Pre-fix expected: FAIL — AmeBadge source contains no `.semantics`
+     *   block referencing the badge variant.
+     * Post-fix expected: PASS — source sets contentDescription to
+     *   "${label}, ${variant} indicator".
+     */
+    @Test
+    fun testBadgeAccessibilityIncludesVariant() {
+        val source = readRendererSource()
+        val badgeBlock = extractFunctionBody(source, "AmeBadge")
+        assertTrue(
+            badgeBlock.contains("semantics") &&
+                badgeBlock.contains("contentDescription") &&
+                badgeBlock.contains("variant"),
+            "BUG #41a: AmeBadge must declare a semantics block whose " +
+                "contentDescription includes the variant name. Source did not " +
+                "contain the expected pattern."
+        )
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Bug 41b — Card children not grouped as a single semantics node (v1.4)
+    // ════════════════════════════════════════════════════════════════════
+
+    /**
+     * Audit Bug #41b: AmeCard rendered each child as an independently
+     * focusable semantics element, breaking the spec's accessibility note
+     * that a card SHOULD be announced as a single unit.
+     *
+     * Spec section: specification/v1.0/primitives.md (card accessibility)
+     * Audit reference: AUDIT_VERDICTS.md#bug-41b
+     * Pre-fix expected: FAIL — AmeCard source has no
+     *   `semantics(mergeDescendants = true)`.
+     * Post-fix expected: PASS — modifier chains the merge descriptor.
+     */
+    @Test
+    fun testCardMergesSemanticsDescendants() {
+        val source = readRendererSource()
+        val cardBlock = extractFunctionBody(source, "AmeCard")
+        assertTrue(
+            cardBlock.contains("semantics(mergeDescendants = true)"),
+            "BUG #41b: AmeCard must merge descendant semantics nodes via " +
+                "Modifier.semantics(mergeDescendants = true). Source did not " +
+                "contain the expected pattern."
+        )
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // v1.4 list_item — nested click target isolation (NORMATIVE)
+    // ════════════════════════════════════════════════════════════════════
+
+    /**
+     * v1.4 §list_item NORMATIVE rule: when `list_item` has both a row-level
+     * `action` and a `trailing` that is itself an interactive node (Btn),
+     * the renderer MUST isolate the trailing tap so it does not also fire
+     * the row action. Material 3's `ListItem` slot API handles this
+     * natively — the `trailingContent` slot is rendered outside the row's
+     * `clickable` modifier.
+     *
+     * This test was written FAILING-FIRST per regression-protocol.md §1-2:
+     * before AmeListItem was implemented, the dispatch hadn't been added
+     * and the test failed at composition. With the v1.4 implementation it
+     * passes.
+     */
+    @Test
+    fun testListItemNestedClickTargetIsolation() {
+        var rowActionFired = false
+        var trailingBtnActionFired = false
+
+        val node = AmeNode.ListItem(
+            title = "Pizza Place",
+            subtitle = "71 Mulberry St",
+            leading = AmeNode.Icon("restaurant"),
+            trailing = AmeNode.Btn(
+                label = "Directions",
+                action = AmeAction.Navigate("/dir")
+            ),
+            action = AmeAction.Navigate("/detail")
+        )
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                AmeRenderer(
+                    node = node,
+                    formState = AmeFormState(),
+                    onAction = { action ->
+                        when ((action as AmeAction.Navigate).route) {
+                            "/detail" -> rowActionFired = true
+                            "/dir" -> trailingBtnActionFired = true
+                        }
+                    },
+                )
+            }
+        }
+
+        // Tap the trailing button. Material 3 ListItem renders trailingContent
+        // outside its row clickable region, so the row action MUST NOT fire.
+        composeTestRule.onNodeWithText("Directions").performClick()
+        assertTrue(
+            trailingBtnActionFired,
+            "v1.4 §list_item: trailing button tap must fire its own action."
+        )
+        assertEquals(
+            false, rowActionFired,
+            "v1.4 §list_item NORMATIVE: row action MUST NOT fire when " +
+                "trailing button is tapped."
+        )
+
+        // Reset and tap the row title — only the row action must fire.
+        trailingBtnActionFired = false
+        composeTestRule.onNodeWithText("Pizza Place").performClick()
+        assertTrue(
+            rowActionFired,
+            "v1.4 §list_item: row title tap must fire the row action."
+        )
+        assertEquals(
+            false, trailingBtnActionFired,
+            "v1.4 §list_item: trailing button MUST NOT fire when row title is tapped."
+        )
+    }
+
+    // ── Source-structural test helpers ────────────────────────────────
+
+    /** Read the AmeRenderer.kt source file from the working tree. */
+    private fun readRendererSource(): String {
+        val file = java.io.File(
+            "src/main/kotlin/com/agenticmobile/ame/compose/AmeRenderer.kt"
+        )
+        if (!file.exists()) {
+            // Tests run from repo root or from ame-compose/. Try both.
+            val alt = java.io.File(
+                "ame-compose/src/main/kotlin/com/agenticmobile/ame/compose/AmeRenderer.kt"
+            )
+            if (alt.exists()) return alt.readText()
+            error("Could not locate AmeRenderer.kt; cwd=${java.io.File(".").absolutePath}")
+        }
+        return file.readText()
+    }
+
+    /**
+     * Extract the body of a top-level private composable function from the
+     * source. Naive but sufficient for source-structural assertions: matches
+     * `private fun <name>(` and returns from there to the closing `}` of the
+     * function (paren-balance walk).
+     */
+    private fun extractFunctionBody(source: String, name: String): String {
+        val start = source.indexOf("private fun $name(")
+        if (start == -1) error("Function 'private fun $name(' not found in source.")
+        val brace = source.indexOf('{', start)
+        if (brace == -1) error("No opening brace after function '$name'.")
+        var depth = 1
+        var i = brace + 1
+        while (i < source.length && depth > 0) {
+            when (source[i]) {
+                '{' -> depth++
+                '}' -> depth--
+            }
+            i++
+        }
+        return source.substring(brace, i)
     }
 }

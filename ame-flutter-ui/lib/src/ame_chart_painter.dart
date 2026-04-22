@@ -25,7 +25,7 @@ class CanvasChartRenderer extends AmeChartRenderer {
 
     // Empty-state handling. The first branch covers the case where there is
     // no data at all (bar/pie/sparkline included). The second branch is
-    // line-specific (Bug 28c, Flutter analog of v1.2 Bug 4c): a line chart
+    // line-specific: a line chart
     // whose every series has fewer than two points cannot render a stroke,
     // so the documented empty state replaces the silent no-op that the
     // pre-fix painter produced.
@@ -123,19 +123,14 @@ class ChartRange {
       'range: $range, baselineY: $baselineY)';
 }
 
-/// Pure chart math utilities, lifted out of the painter layer so audit
-/// regression tests can call production code directly instead of mirroring
-/// formulas.
+/// Pure chart math utilities, lifted out of the painter layer so tests can
+/// call production code directly instead of mirroring formulas.
 ///
-/// Resolves Bug 28 (Flutter analog of v1.2 Bug 4) by guaranteeing that
-/// every chart with a mix of positive and negative values draws against a
-/// visible baseline at value=0, that line charts with fewer than two
-/// points per series produce the documented empty state at the renderer
-/// level, and that multi-series charts share an X stride so the same
-/// index of every series falls at the same x coordinate.
-///
-/// Mirrors the Compose canonical implementation in
-/// `ame-compose/.../AmeChartRenderer.kt::ChartMath` lines 91-165.
+/// Guarantees that charts with a mix of positive and negative values draw
+/// against a visible baseline at value=0, that line charts with fewer than
+/// two points per series produce the documented empty state at the renderer
+/// level, and that multi-series charts share an X stride so the same index
+/// of every series falls at the same x coordinate.
 @visibleForTesting
 class ChartMath {
   ChartMath._();
@@ -185,7 +180,7 @@ class ChartMath {
 
   /// Shared X stride for multi-series charts. Using the LONGEST series'
   /// length means index N of any series falls at the same X coordinate,
-  /// even when series lengths differ. Resolves Bug 28d.
+  /// even when series lengths differ.
   static double computeSharedStepX(
     double width,
     double horizontalPadding,
@@ -224,7 +219,7 @@ class _BarChartPainter extends CustomPainter {
     final barPaint = Paint()..color = color;
 
     for (var i = 0; i < data.length; i++) {
-      // Bug 28a fix: ChartMath.computeBar produces sign-aware (yTop, height)
+      // ChartMath.computeBar produces sign-aware (yTop, height)
       // in chart-relative units; multiplying by chartHeight maps it into
       // pixel space. Positive bars rise from the baseline, negative bars
       // hang from it. Minimum visible height of 2.0px preserves the
@@ -265,7 +260,7 @@ class _LineChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // The renderer's empty-state branch (Bug 28c) handles the
+    // The renderer's empty-state branch handles the
     // "no series with >= 2 points" case before the painter is invoked, so
     // here we may safely assume at least one series with >= 2 points
     // exists. The defensive empty checks below are belt-and-braces in
@@ -278,11 +273,10 @@ class _LineChartPainter extends CustomPainter {
     final allValues = allSeries.expand((s) => s).toList();
     if (allValues.isEmpty) return;
 
-    // Bug 28b/d fixes: a single ChartRange spans the union of all series so
-    // negative-only data stays in [0, chartHeight] (28b) and ChartMath
-    // returns Y in chart-relative units (28b). A shared stepX keyed to the
-    // longest series guarantees that index N of every series lands at the
-    // same X coordinate (28d).
+    // A single ChartRange spans the union of all series so negative-only
+    // data stays in [0, chartHeight] and ChartMath returns Y in
+    // chart-relative units. A shared stepX keyed to the longest series
+    // guarantees that index N of every series lands at the same X coordinate.
     final range = ChartMath.computeRange(allValues);
     final maxPoints = allSeries.map((s) => s.length).reduce(math.max);
     final labelTexts = labels ?? const [];

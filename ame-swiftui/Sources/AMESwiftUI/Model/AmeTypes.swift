@@ -4,13 +4,16 @@ import Foundation
 
 /// Horizontal/vertical alignment for layout primitives.
 /// col supports: start, center, end
-/// row supports: start, center, end, space_between, space_around
+/// row main-axis (align): start, center, end, space_between, space_around
+/// row cross-axis (crossAlign): top, center, bottom
 public enum Align: String, Codable, Equatable, CaseIterable, Sendable {
     case start
     case center
     case end
     case spaceBetween = "space_between"
     case spaceAround = "space_around"
+    case top
+    case bottom
 }
 
 // MARK: - TxtStyle
@@ -112,8 +115,9 @@ public struct AmeKeywords {
 
     public static let standardPrimitives: Set<String> = [
         "col", "row", "txt", "btn", "card", "badge", "icon", "img",
-        "input", "toggle", "list", "table", "divider", "spacer", "progress",
-        "chart", "code", "accordion", "carousel", "callout", "timeline", "timeline_item"
+        "input", "toggle", "list", "list_item", "table", "divider", "spacer",
+        "progress", "chart", "code", "accordion", "carousel", "callout",
+        "timeline", "timeline_item"
     ]
 
     public static let actionNames: Set<String> = ["tool", "uri", "nav", "copy", "submit"]
@@ -128,11 +132,8 @@ public struct AmeKeywords {
     /// classes: standard primitive names, action names, structural keywords
     /// (`each`, `root`), or boolean literals.
     ///
-    /// Note (v1.2 / Bug 9): enum-value tokens (`title`, `primary`, `done`,
-    /// etc.) are NOT reserved and MAY be used as user-defined identifiers.
-    /// The parser disambiguates by argument position. See
-    /// `specification/v1.0/syntax.md` Reserved Keywords section for the
-    /// canonical list and the rationale for NOT reserving enum-value tokens.
+    /// Enum-value tokens (`title`, `primary`, `done`, etc.) are intentionally
+    /// NOT reserved; the parser disambiguates by argument position per syntax.md.
     public static func isReserved(_ identifier: String) -> Bool {
         standardPrimitives.contains(identifier) ||
         actionNames.contains(identifier) ||

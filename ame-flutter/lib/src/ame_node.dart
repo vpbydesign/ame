@@ -3,7 +3,7 @@ import 'ame_types.dart';
 
 /// Sealed class representing all AME UI node types.
 ///
-/// 24 subtypes total: 21 visual primitives + Divider + Ref + Each.
+/// 25 subtypes total: 22 visual primitives + Divider + Ref + Each.
 ///
 /// Children are List<AmeNode> (resolved tree form). The parser converts
 /// identifier strings to Ref nodes during parsing, then resolves Ref -> real
@@ -43,6 +43,8 @@ sealed class AmeNode {
         return AmeToggle.fromJson(json);
       case 'list':
         return AmeDataList.fromJson(json);
+      case 'list_item':
+        return AmeListItem.fromJson(json);
       case 'table':
         return AmeTable.fromJson(json);
       case 'chart':
@@ -110,22 +112,41 @@ final class AmeCol extends AmeNode {
 }
 
 /// Horizontal row layout.
+///
+/// Named-only optional fields:
+/// - [weights]: per-child flex weights for proportional width distribution.
+///   null = all children intrinsic. 0 = intrinsic. >0 = fill.
+/// - [crossAlign]: vertical alignment of children within the row.
+///   null = center. Valid: Align.top, Align.center, Align.bottom.
+///
+/// Both default to null and are omitted from JSON when unset, so
+/// conformance fixtures remain byte-identical.
 final class AmeRow extends AmeNode {
   final List<AmeNode> children;
   final Align align;
   final int gap;
+  final List<int>? weights;
+  final Align? crossAlign;
 
   const AmeRow({
     this.children = const [],
     this.align = Align.start,
     this.gap = 8,
+    this.weights,
+    this.crossAlign,
   });
 
   factory AmeRow.fromJson(Map<String, dynamic> json) {
+    final weightsRaw = json['weights'];
+    final weights = weightsRaw is List
+        ? weightsRaw.map((e) => (e as num).toInt()).toList()
+        : null;
     return AmeRow(
       children: _childrenFromJson(json['children']),
       align: Align.fromString(json['align'] as String? ?? '') ?? Align.start,
       gap: (json['gap'] as num?)?.toInt() ?? 8,
+      weights: weights,
+      crossAlign: Align.fromString(json['cross_align'] as String? ?? ''),
     );
   }
 
@@ -137,6 +158,8 @@ final class AmeRow extends AmeNode {
     }
     if (align != Align.start) map['align'] = align.value;
     if (gap != 8) map['gap'] = gap;
+    if (weights != null) map['weights'] = weights;
+    if (crossAlign != null) map['cross_align'] = crossAlign!.value;
     return map;
   }
 
@@ -146,13 +169,22 @@ final class AmeRow extends AmeNode {
       other is AmeRow &&
           _listsEqual(children, other.children) &&
           align == other.align &&
-          gap == other.gap;
+          gap == other.gap &&
+          _intListsEqual(weights, other.weights) &&
+          crossAlign == other.crossAlign;
 
   @override
-  int get hashCode => Object.hash(Object.hashAll(children), align, gap);
+  int get hashCode => Object.hash(
+        Object.hashAll(children),
+        align,
+        gap,
+        weights == null ? null : Object.hashAll(weights!),
+        crossAlign,
+      );
 
   @override
-  String toString() => 'AmeRow(children: $children, align: $align, gap: $gap)';
+  String toString() =>
+      'AmeRow(children: $children, align: $align, gap: $gap, weights: $weights, crossAlign: $crossAlign)';
 }
 
 // ── Content Primitives ───────────────────────────────────────────────────
@@ -558,7 +590,7 @@ final class AmeInput extends AmeNode {
 
 /// Labeled toggle switch for boolean choices.
 /// Field is named [defaultValue] because `default` is reserved in Dart.
-/// Serializes as "default" in JSON to match Kotlin/Swift.
+/// Serializes as "default" in JSON.
 final class AmeToggle extends AmeNode {
   final String id;
   final String label;
@@ -698,6 +730,80 @@ final class AmeTable extends AmeNode {
   String toString() => 'AmeTable(headers: $headers, rows: $rows)';
 }
 
+/// Structured single-row list entry with title, optional subtitle, optional
+/// leading and trailing nodes, and an optional whole-row tap action.
+///
+/// Nested click target rule (NORMATIVE): when both [action] and [trailing]
+/// are present and [trailing] is itself an interactive node (AmeBtn), the
+/// renderer MUST isolate the trailing tap so it does not also fire [action].
+/// See `specification/v1.0/primitives.md` §list_item for the full rule and
+/// platform-specific guidance.
+///
+/// [action] is named-only in AME source: list_item("Title", action=nav("/x")).
+/// Positional slots are reserved for title, subtitle, leading, trailing.
+final class AmeListItem extends AmeNode {
+  final String title;
+  final String? subtitle;
+  final AmeNode? leading;
+  final AmeNode? trailing;
+  final AmeAction? action;
+
+  const AmeListItem({
+    required this.title,
+    this.subtitle,
+    this.leading,
+    this.trailing,
+    this.action,
+  });
+
+  factory AmeListItem.fromJson(Map<String, dynamic> json) {
+    final leadingJson = json['leading'];
+    final trailingJson = json['trailing'];
+    final actionJson = json['action'];
+    return AmeListItem(
+      title: json['title'] as String? ?? '',
+      subtitle: json['subtitle'] as String?,
+      leading: leadingJson is Map<String, dynamic>
+          ? AmeNode.fromJson(leadingJson)
+          : null,
+      trailing: trailingJson is Map<String, dynamic>
+          ? AmeNode.fromJson(trailingJson)
+          : null,
+      action: actionJson is Map<String, dynamic>
+          ? AmeAction.fromJson(actionJson)
+          : null,
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{'_type': 'list_item', 'title': title};
+    if (subtitle != null) map['subtitle'] = subtitle;
+    if (leading != null) map['leading'] = leading!.toJson();
+    if (trailing != null) map['trailing'] = trailing!.toJson();
+    if (action != null) map['action'] = action!.toJson();
+    return map;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AmeListItem &&
+          title == other.title &&
+          subtitle == other.subtitle &&
+          leading == other.leading &&
+          trailing == other.trailing &&
+          action == other.action;
+
+  @override
+  int get hashCode =>
+      Object.hash(title, subtitle, leading, trailing, action);
+
+  @override
+  String toString() =>
+      'AmeListItem(title: $title, subtitle: $subtitle, leading: $leading, trailing: $trailing, action: $action)';
+}
+
 // ── Visualization Primitives ─────────────────────────────────────────────
 
 /// Data visualization chart. Supports line, bar, pie, and sparkline types.
@@ -716,8 +822,7 @@ final class AmeTable extends AmeNode {
 /// resolves to a 1D array (one series per path). This corresponds to the
 /// spec syntax `series=[$a, $b]`. Resolution is all-or-nothing: if any
 /// path fails to resolve, [series] stays null so the renderer shows the
-/// empty state rather than a misleading partial chart. (Bug 31, Flutter
-/// analog of v1.2 Bug 7.)
+/// empty state rather than a misleading partial chart.
 final class AmeChart extends AmeNode {
   final ChartType type;
   final List<double>? values;
@@ -977,10 +1082,10 @@ final class AmeCarousel extends AmeNode {
 
 /// Visually distinct alert/info box with type-specific icon and tint.
 ///
-/// [color] is an optional [SemanticColor] override per primitives.md
-/// (Bug 30, Flutter analog of v1.2 Bug 6). When non-null it overrides
-/// the type-derived tint at render time. Omitted from JSON when null
-/// to keep cross-runtime byte-equality on existing fixtures.
+/// [color] is an optional [SemanticColor] override per primitives.md.
+/// When non-null it overrides the type-derived tint at render time.
+/// Omitted from JSON when null to preserve byte-equality on existing
+/// fixtures.
 final class AmeCallout extends AmeNode {
   final CalloutType type;
   final String content;
@@ -1211,6 +1316,16 @@ bool _listsEqual(List<AmeNode> a, List<AmeNode> b) {
 }
 
 bool _stringListsEqual(List<String> a, List<String> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
+bool _intListsEqual(List<int>? a, List<int>? b) {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
   if (a.length != b.length) return false;
   for (var i = 0; i < a.length; i++) {
     if (a[i] != b[i]) return false;

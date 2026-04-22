@@ -1,12 +1,15 @@
 /// Horizontal/vertical alignment for layout primitives.
 /// col supports: start, center, end
-/// row supports: start, center, end, space_between, space_around
+/// row main-axis (align): start, center, end, space_between, space_around
+/// row cross-axis (crossAlign): top, center, bottom
 enum Align {
   start('start'),
   center('center'),
   end('end'),
   spaceBetween('space_between'),
-  spaceAround('space_around');
+  spaceAround('space_around'),
+  top('top'),
+  bottom('bottom');
 
   const Align(this.value);
   final String value;

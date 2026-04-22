@@ -2,7 +2,7 @@ import Foundation
 
 /// Sealed type representing all AME UI node types.
 ///
-/// 21 visual primitives (matching primitives.md v1.1 exactly),
+/// 22 visual primitives (matching primitives.md exactly),
 /// 1 streaming forward reference (ref),
 /// 1 data iteration construct (each).
 ///
@@ -26,7 +26,17 @@ public indirect enum AmeNode: Equatable, Sendable {
     ///
     /// Parser disambiguation: when a numeric literal appears as the second positional
     /// argument, it is interpreted as `gap`, not `align`.
-    case row(children: [AmeNode] = [], align: Align = .start, gap: Int = 8)
+    ///
+    /// Named-only optional fields:
+    /// - `weights`: per-child flex weights for proportional width distribution.
+    ///   nil = all children intrinsic. 0 = intrinsic. >0 = fill.
+    /// - `crossAlign`: vertical alignment of children within the row.
+    ///   nil = center. Valid: .top, .center, .bottom.
+    ///
+    /// Both default to nil. The Codable encoder omits nil fields, so
+    /// conformance fixtures remain byte-identical.
+    case row(children: [AmeNode] = [], align: Align = .start, gap: Int = 8,
+             weights: [Int]? = nil, crossAlign: Align? = nil)
 
     // MARK: Content Primitives
 
@@ -72,11 +82,24 @@ public indirect enum AmeNode: Equatable, Sendable {
 
     /// Vertical list of children, optionally separated by dividers.
     /// Named `dataList` to avoid collision with Swift's `List` view type.
-    /// Serializes as `_type: "list"` matching the Kotlin @SerialName.
+    /// Serializes as `_type: "list"` to avoid collision with language-level List types.
     case dataList(children: [AmeNode] = [], dividers: Bool = true)
 
     /// Grid of text values with a header row.
     case table(headers: [String], rows: [[String]])
+
+    /// Structured single-row list entry with title, optional subtitle,
+    /// optional leading and trailing nodes, and an optional whole-row tap action.
+    ///
+    /// Nested click target rule (NORMATIVE): when both `action` and `trailing`
+    /// are present and `trailing` is itself an interactive node (.btn), the
+    /// renderer MUST isolate the trailing tap so it does not also fire `action`.
+    /// See `specification/v1.0/primitives.md` §list_item for the full rule.
+    ///
+    /// `action` is named-only in AME source: list_item("Title", action=nav("/x")).
+    /// Positional slots are reserved for title, subtitle, leading, trailing.
+    case listItem(title: String, subtitle: String? = nil, leading: AmeNode? = nil,
+                  trailing: AmeNode? = nil, action: AmeAction? = nil)
 
     // MARK: Visualization Primitives
 
@@ -183,6 +206,10 @@ extension AmeNode: Codable {
         case peek
         case subtitle
         case status
+        case weights
+        case crossAlign = "cross_align"
+        case leading
+        case trailing
     }
 
     // Separate CodingKeys for encoding to handle the _type vs type collision.
@@ -201,11 +228,13 @@ extension AmeNode: Codable {
             if !children.isEmpty { try container.encode(children, forKey: .children) }
             if align != .start { try container.encode(align, forKey: .align) }
 
-        case .row(let children, let align, let gap):
+        case .row(let children, let align, let gap, let weights, let crossAlign):
             try container.encode("row", forKey: .type)
             if !children.isEmpty { try container.encode(children, forKey: .children) }
             if align != .start { try container.encode(align, forKey: .align) }
             if gap != 8 { try container.encode(gap, forKey: .gap) }
+            if let weights { try container.encode(weights, forKey: .weights) }
+            if let crossAlign { try container.encode(crossAlign, forKey: .crossAlign) }
 
         case .txt(let text, let style, let maxLines, let color):
             try container.encode("txt", forKey: .type)
@@ -245,8 +274,8 @@ extension AmeNode: Codable {
         case .progress(let value, let label):
             try container.encode("progress", forKey: .type)
             // Wrap in PreservedFloat so whole-number values (e.g. 1.0)
-            // round-trip with the canonical Kotlin `1.0` form, not Foundation's
-            // truncated `1` (Bug 21). AmeSerializer.toJson strips the sentinels.
+            // round-trip with the canonical `1.0` form. AmeSerializer.toJson
+            // strips the sentinels.
             try container.encode(PreservedFloat(value), forKey: .value)
             if let label { try container.encode(label, forKey: .label) }
 
@@ -280,14 +309,21 @@ extension AmeNode: Codable {
             try container.encode(headers, forKey: .headers)
             try container.encode(rows, forKey: .rows)
 
+        case .listItem(let itemTitle, let itemSubtitle, let leading, let trailing, let itemAction):
+            try container.encode("list_item", forKey: .type)
+            try container.encode(itemTitle, forKey: .title)
+            if let itemSubtitle { try container.encode(itemSubtitle, forKey: .subtitle) }
+            if let leading { try container.encode(leading, forKey: .leading) }
+            if let trailing { try container.encode(trailing, forKey: .trailing) }
+            if let itemAction { try container.encode(itemAction, forKey: .action) }
+
         case .chart(let chartType, let values, let labels, let series, let height, let color,
                     let valuesPath, let labelsPath, let seriesPath, let seriesPaths):
             try container.encode("chart", forKey: .type)
             try container.encode(chartType, forKey: .inputType)
             // Wrap Double-typed arrays in PreservedDouble so whole-number
-            // values (e.g. [1, 2, 3]) round-trip with the canonical Kotlin
-            // `[1.0,2.0,3.0]` form, not Foundation's truncated `[1,2,3]`
-            // (Bug 21). AmeSerializer.toJson strips the sentinels.
+            // values (e.g. [1, 2, 3]) round-trip with the canonical
+            // `[1.0,2.0,3.0]` form. AmeSerializer.toJson strips the sentinels.
             if let values { try container.encode(values.map { PreservedDouble($0) }, forKey: .values) }
             if let labels { try container.encode(labels, forKey: .labels) }
             if let series { try container.encode(series.map { $0.map { PreservedDouble($0) } }, forKey: .series) }
@@ -357,7 +393,10 @@ extension AmeNode: Codable {
             let children = try container.decodeIfPresent([AmeNode].self, forKey: .children) ?? []
             let align = try container.decodeIfPresent(Align.self, forKey: .align) ?? .start
             let gap = try container.decodeIfPresent(Int.self, forKey: .gap) ?? 8
-            self = .row(children: children, align: align, gap: gap)
+            let weights = try container.decodeIfPresent([Int].self, forKey: .weights)
+            let crossAlign = try container.decodeIfPresent(Align.self, forKey: .crossAlign)
+            self = .row(children: children, align: align, gap: gap,
+                        weights: weights, crossAlign: crossAlign)
 
         case "txt":
             let text = try container.decode(String.self, forKey: .text)
@@ -428,6 +467,15 @@ extension AmeNode: Codable {
             let headers = try container.decode([String].self, forKey: .headers)
             let rows = try container.decode([[String]].self, forKey: .rows)
             self = .table(headers: headers, rows: rows)
+
+        case "list_item":
+            let itemTitle = try container.decode(String.self, forKey: .title)
+            let itemSubtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
+            let leading = try container.decodeIfPresent(AmeNode.self, forKey: .leading)
+            let trailing = try container.decodeIfPresent(AmeNode.self, forKey: .trailing)
+            let itemAction = try container.decodeIfPresent(AmeAction.self, forKey: .action)
+            self = .listItem(title: itemTitle, subtitle: itemSubtitle,
+                             leading: leading, trailing: trailing, action: itemAction)
 
         case "chart":
             let chartType = try container.decode(ChartType.self, forKey: .inputType)

@@ -482,6 +482,111 @@ final class AuditedSwiftUIBugTests: XCTestCase {
             )
         }
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Bug 39 — DataList items had zero vertical rhythm (v1.4)
+    // ════════════════════════════════════════════════════════════════════
+
+    /// Audit Bug #39: renderDataList previously used `VStack(spacing: 0)`,
+    /// flushing list items together with no breathing room.
+    ///
+    /// Pre-fix expected: FAIL — body contains `spacing: 0`.
+    /// Post-fix expected: PASS — body uses dividers-conditional spacing.
+    func testDataListHasVerticalSpacing() throws {
+        let body = try renderFnBody("renderDataList")
+        XCTAssertTrue(
+            body.contains("dividers ? 8 : 12") || (body.contains("dividers") && body.contains("VStack(spacing:")),
+            "BUG #39: renderDataList must use a dividers-conditional VStack spacing. " +
+            "Body sampled: \(body.prefix(500))"
+        )
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Bug 40 — Carousel items grow beyond comfortable widths on tablets (v1.4)
+    // ════════════════════════════════════════════════════════════════════
+
+    /// Audit Bug #40: on Pixel Fold and other large form factors, the
+    /// `width * 0.85` formula produced cards wider than 400pt. v1.4 clamps
+    /// to a 340pt max — Material 3's recommended max card width.
+    ///
+    /// Pre-fix expected: FAIL — body uses unclamped `width * 0.85`.
+    /// Post-fix expected: PASS — body uses `min(...340)`.
+    func testCarouselItemHasMaxWidthClamp() throws {
+        let body = try renderFnBody("renderCarousel")
+        XCTAssertTrue(
+            body.contains("min(") && body.contains("340"),
+            "BUG #40: renderCarousel must clamp item width to 340pt max. " +
+            "Body sampled: \(body.prefix(500))"
+        )
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Bug 41a — Badge variant not announced by VoiceOver (v1.4)
+    // ════════════════════════════════════════════════════════════════════
+
+    /// Audit Bug #41a: AmeBadge previously had no accessibility label, so
+    /// VoiceOver read only the label ("4.5") with no indication of the
+    /// status indicator's variant.
+    ///
+    /// Pre-fix expected: FAIL — body has no accessibilityLabel referencing variant.
+    /// Post-fix expected: PASS — body sets a label combining label and variant.
+    func testBadgeAccessibilityIncludesVariant() throws {
+        let body = try renderFnBody("renderBadge")
+        XCTAssertTrue(
+            body.contains("accessibilityLabel") && body.contains("variant"),
+            "BUG #41a: renderBadge must set accessibilityLabel including the variant name. " +
+            "Body sampled: \(body.prefix(500))"
+        )
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Bug 41b — Card children not grouped as a single semantics node (v1.4)
+    // ════════════════════════════════════════════════════════════════════
+
+    /// Audit Bug #41b: AmeCard rendered each child as an independently
+    /// focusable accessibility element, breaking the spec's note that a
+    /// card SHOULD be announced as a single unit.
+    ///
+    /// Pre-fix expected: FAIL — body has no accessibilityElement modifier.
+    /// Post-fix expected: PASS — body uses `.accessibilityElement(children: .combine)`.
+    func testCardCombinesAccessibilityChildren() throws {
+        let body = try renderFnBody("renderCard")
+        XCTAssertTrue(
+            body.contains(".accessibilityElement(children: .combine)"),
+            "BUG #41b: renderCard must combine children into a single accessibility element. " +
+            "Body sampled: \(body.prefix(500))"
+        )
+    }
+
+    // ── Source-structural test helper ─────────────────────────────────
+
+    /// Read the body of a private renderer function from AmeRenderer.swift.
+    /// Returns content from the opening `{` of the function body up to the
+    /// next `private func ` declaration (or end of file).
+    private func renderFnBody(_ name: String) throws -> String {
+        let rendererSourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/AMESwiftUI/Renderer/AmeRenderer.swift")
+        let source = try String(contentsOf: rendererSourceURL, encoding: .utf8)
+        guard let funcStart = source.range(of: "private func \(name)(") else {
+            throw NSError(domain: "test", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Could not locate '\(name)' in source"
+            ])
+        }
+        guard let bodyOpen = source.range(of: "{", range: funcStart.upperBound..<source.endIndex) else {
+            throw NSError(domain: "test", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "Could not locate body opening brace for '\(name)'"
+            ])
+        }
+        let endIndex = source.index(bodyOpen.upperBound, offsetBy: 3000, limitedBy: source.endIndex) ?? source.endIndex
+        let bodyRaw = String(source[bodyOpen.upperBound..<endIndex])
+        if let nextFunc = bodyRaw.range(of: "private func ") {
+            return String(bodyRaw[..<nextFunc.lowerBound])
+        }
+        return bodyRaw
+    }
 }
 
 import Combine

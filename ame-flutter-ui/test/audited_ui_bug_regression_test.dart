@@ -359,4 +359,130 @@ void main() {
       );
     });
   });
+
+  // ════════════════════════════════════════════════════════════════════
+  // v1.4 — Renderer quality fixes (Bugs 39, 40, 41a, 41b)
+  // ════════════════════════════════════════════════════════════════════
+
+  group('v1.4 Renderer quality fixes', () {
+    String rendererSource() {
+      // Tests run from ame-flutter-ui/, so the renderer source is a relative path.
+      final f = File('lib/src/ame_renderer.dart');
+      if (f.existsSync()) return f.readAsStringSync();
+      // Fallback for repo-root invocation.
+      final alt = File('ame-flutter-ui/lib/src/ame_renderer.dart');
+      if (alt.existsSync()) return alt.readAsStringSync();
+      throw StateError(
+        'Could not locate ame_renderer.dart from cwd ${Directory.current.path}',
+      );
+    }
+
+    String fnBody(String source, String name) {
+      final start = source.indexOf('Widget $name(');
+      if (start == -1) {
+        throw StateError("Function 'Widget $name(' not found in source.");
+      }
+      final brace = source.indexOf('{', start);
+      if (brace == -1) {
+        throw StateError("No opening brace after function '$name'.");
+      }
+      var depth = 1;
+      var i = brace + 1;
+      while (i < source.length && depth > 0) {
+        final c = source[i];
+        if (c == '{') depth++;
+        if (c == '}') depth--;
+        i++;
+      }
+      return source.substring(brace, i);
+    }
+
+    test('Bug 39: _renderDataList uses dividers-conditional spacing', () {
+      // Bug #39 (v1.4): list items had zero vertical rhythm. With dividers
+      // the renderer must add 8dp breathing room; without, 12dp compensates
+      // for the missing visual separator.
+      final body = fnBody(rendererSource(), '_renderDataList');
+      expect(
+        body.contains('node.dividers') &&
+            (body.contains('SizedBox(height: 8') ||
+                body.contains('SizedBox(height: 12') ||
+                body.contains('dividers ? 8')),
+        isTrue,
+        reason:
+            'BUG #39: _renderDataList must apply a dividers-conditional '
+            'vertical spacing. Body sampled: ${body.substring(0, body.length.clamp(0, 500))}',
+      );
+    });
+
+    test('Bug 40: _renderCarousel clamps item width to 340dp max', () {
+      // Bug #40 (v1.4): on Pixel Fold and other large form factors,
+      // 0.85 of the viewport produced cards wider than 400dp.
+      final body = fnBody(rendererSource(), '_renderCarousel');
+      expect(
+        body.contains('340'),
+        isTrue,
+        reason:
+            'BUG #40: _renderCarousel must clamp item width to 340dp max. '
+            'Body sampled: ${body.substring(0, body.length.clamp(0, 500))}',
+      );
+    });
+
+    test('Bug 41a: _renderBadge announces variant via Semantics', () {
+      // Bug #41a (v1.4): badge variant must be announced by screen readers
+      // so a user hears "4.5, info indicator" rather than just "4.5".
+      final body = fnBody(rendererSource(), '_renderBadge');
+      expect(
+        body.contains('Semantics(') && body.contains('variant'),
+        isTrue,
+        reason:
+            'BUG #41a: _renderBadge must wrap output in Semantics with a '
+            'label including the variant. Body sampled: '
+            '${body.substring(0, body.length.clamp(0, 500))}',
+      );
+    });
+
+    test('Bug 41b: _renderCard merges semantics descendants', () {
+      // Bug #41b (v1.4): card children must be grouped into a single
+      // semantics node so screen readers announce a card as one unit.
+      final body = fnBody(rendererSource(), '_renderCard');
+      expect(
+        body.contains('MergeSemantics'),
+        isTrue,
+        reason:
+            'BUG #41b: _renderCard must wrap its tree in MergeSemantics. '
+            'Body sampled: ${body.substring(0, body.length.clamp(0, 500))}',
+      );
+    });
+
+    test('v1.4 list_item: _renderListItem uses ListTile with onTap', () {
+      // Verifies the v1.4 nested click target rule via Flutter's native
+      // ListTile.onTap behavior. ListTile's `trailing` widgets that own
+      // their own gesture detectors consume taps before ListTile.onTap fires.
+      final body = fnBody(rendererSource(), '_renderListItem');
+      expect(
+        body.contains('ListTile') &&
+            body.contains('onTap:') &&
+            body.contains('trailing:'),
+        isTrue,
+        reason:
+            'v1.4 §list_item: _renderListItem must use Material ListTile '
+            'with onTap and trailing slots so trailing buttons own their '
+            'own gesture handling.',
+      );
+    });
+
+    test('v1.4 row weights: _renderRow uses Expanded(flex:) for weighted children', () {
+      // Verifies the VirtualOn 229dp regression fix: weighted children
+      // get `Expanded(flex: w)` for proportional fill, intrinsic children
+      // are added naked.
+      final body = fnBody(rendererSource(), '_renderRow');
+      expect(
+        body.contains('Expanded(flex:') && body.contains('node.weights'),
+        isTrue,
+        reason:
+            'v1.4 row weights: _renderRow must wrap weighted children in '
+            'Expanded(flex: w) when node.weights specifies a positive value.',
+      );
+    });
+  });
 }

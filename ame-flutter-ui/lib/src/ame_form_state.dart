@@ -13,11 +13,9 @@ class AmeFormState extends ChangeNotifier {
   final Map<String, bool> _toggleValues = {};
 
   /// Diagnostic surface populated by [collectValues] when an input id
-  /// and a toggle id collide (Bug 33, Flutter analog of v1.2 Bug 12).
-  /// Soft-warn only: the merge order is preserved (toggle wins) so that
-  /// the input/toggle contract documented in WP#4 Bug 5 stays stable;
-  /// this list lets hosts detect the data-loss class instead of silently
-  /// shipping bad form payloads.
+  /// and a toggle id collide. Soft-warn only: the merge order is preserved
+  /// (toggle wins); this list lets hosts detect the data-loss class instead
+  /// of silently shipping bad form payloads.
   final List<String> _collisionWarnings = [];
 
   /// Read-only snapshot of warnings recorded during the last
@@ -51,11 +49,8 @@ class AmeFormState extends ChangeNotifier {
   /// Input values are included as-is. Toggle boolean values are
   /// converted to `"true"` or `"false"` strings.
   ///
-  /// Bug 33 fix: when an id is registered as both an input and a toggle,
-  /// the toggle value wins (preserves WP#4 Bug 5 merge-order contract)
-  /// AND a warning is recorded in [warnings] for host visibility. The
-  /// warning text mirrors Kotlin/Swift Bug 12 wording for cross-runtime
-  /// log-grep parity.
+  /// When an id is registered as both an input and a toggle, the toggle
+  /// value wins and a warning is recorded in [warnings] for host visibility.
   Map<String, String> collectValues() {
     _collisionWarnings.clear();
     final result = <String, String>{};
@@ -91,14 +86,10 @@ class AmeFormState extends ChangeNotifier {
         ));
   }
 
-  // Bug 34 fix (Flutter analog of v1.2 Bug 13): the original `\w+`
-  // excluded `-`, so `${input.user-name}` was silently left unsubstituted.
-  // The character class below accepts letters, digits, underscores, and
-  // hyphens. The hyphen sits at the end of the class to avoid being
-  // parsed as a range. The literal `.` separator inside the curly braces
-  // is preserved as a hard separator so `${input.user.name}` (with a
-  // literal `.`) remains a non-match — defends against future
-  // over-permissive expansion that would shadow nested references.
+  // Accepts letters, digits, underscores, and hyphens. The hyphen sits
+  // at the end of the class to avoid being parsed as a range. The literal
+  // `.` separator inside the curly braces is preserved as a hard separator
+  // so `${input.user.name}` remains a non-match.
   static final _inputRefRegex =
       RegExp(r'\$\{input\.([a-zA-Z0-9_-]+)\}');
 }

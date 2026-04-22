@@ -1657,4 +1657,210 @@ class AmeParserTest {
         assertEquals(listOf(40.0, 50.0, 60.0), chart2.values)
         assertNull(chart2.valuesPath)
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // v1.4 — Row weights / crossAlign
+    // ════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun parseRowWithWeights() {
+        val result = parse("""
+            root = row([a, b], weights=[1, 0])
+            a = txt("Wide")
+            b = txt("Narrow")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Row>(result)
+        assertEquals(listOf(1, 0), result.weights)
+        assertNull(result.crossAlign)
+    }
+
+    @Test
+    fun parseRowWithCrossAlign() {
+        val result = parse("""
+            root = row([a, b], crossAlign=top)
+            a = txt("A")
+            b = txt("B")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Row>(result)
+        assertEquals(Align.TOP, result.crossAlign)
+        assertNull(result.weights)
+    }
+
+    @Test
+    fun parseRowWithCrossAlignSnakeCase() {
+        val result = parse("""
+            root = row([a, b], cross_align=bottom)
+            a = txt("A")
+            b = txt("B")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Row>(result)
+        assertEquals(Align.BOTTOM, result.crossAlign)
+    }
+
+    @Test
+    fun parseRowWithWeightsAndCrossAlign() {
+        val result = parse("""
+            root = row([a, b], space_between, 12, weights=[1, 1], crossAlign=top)
+            a = txt("A")
+            b = txt("B")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Row>(result)
+        assertEquals(Align.SPACE_BETWEEN, result.align)
+        assertEquals(12, result.gap)
+        assertEquals(listOf(1, 1), result.weights)
+        assertEquals(Align.TOP, result.crossAlign)
+    }
+
+    @Test
+    fun parseRowWeightsLengthMismatchFallsBack() {
+        val src = """
+            root = row([a, b, c], weights=[1, 0])
+            a = txt("A")
+            b = txt("B")
+            c = txt("C")
+        """.trimIndent()
+        val parser = AmeParser()
+        val result = parser.parse(src)
+
+        assertNotNull(result)
+        assertIs<AmeNode.Row>(result)
+        assertNull(result.weights, "Length mismatch must fall back to null (intrinsic)")
+        assertTrue(parser.warnings.any { it.contains("weights length") }, "Mismatch must log a warning")
+    }
+
+    @Test
+    fun parseRowWithoutNewFieldsIsBackwardCompatible() {
+        val result = parse("""
+            root = row([a, b])
+            a = txt("A")
+            b = txt("B")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.Row>(result)
+        assertNull(result.weights)
+        assertNull(result.crossAlign)
+        assertEquals(Align.START, result.align)
+        assertEquals(8, result.gap)
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // v1.4 — list_item primitive
+    // ════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun parseListItemBasic() {
+        val result = parse("""
+            root = list_item("Pizza Place", "71 Mulberry St", icon("restaurant"), badge("4.5", info))
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.ListItem>(result)
+        assertEquals("Pizza Place", result.title)
+        assertEquals("71 Mulberry St", result.subtitle)
+        assertIs<AmeNode.Icon>(result.leading)
+        assertEquals("restaurant", (result.leading as AmeNode.Icon).name)
+        assertIs<AmeNode.Badge>(result.trailing)
+        assertEquals("4.5", (result.trailing as AmeNode.Badge).label)
+        assertEquals(BadgeVariant.INFO, (result.trailing as AmeNode.Badge).variant)
+        assertNull(result.action)
+    }
+
+    @Test
+    fun parseListItemMinimal() {
+        val result = parse("""root = list_item("Title only")""")
+
+        assertNotNull(result)
+        assertIs<AmeNode.ListItem>(result)
+        assertEquals("Title only", result.title)
+        assertNull(result.subtitle)
+        assertNull(result.leading)
+        assertNull(result.trailing)
+        assertNull(result.action)
+    }
+
+    @Test
+    fun parseListItemWithAction() {
+        val result = parse("""
+            root = list_item("Settings", action=nav("/settings"))
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.ListItem>(result)
+        assertEquals("Settings", result.title)
+        assertNotNull(result.action)
+        assertIs<AmeAction.Navigate>(result.action)
+        assertEquals("/settings", (result.action as AmeAction.Navigate).route)
+    }
+
+    @Test
+    fun parseListItemWithTrailingBtnAndRowAction() {
+        // Nested click target case: row has its own action and trailing has a btn
+        // with its own action. The parser must capture both independently; the
+        // renderer is responsible for tap isolation.
+        val result = parse("""
+            root = list_item("Pizza Place", "71 Mulberry St", icon("restaurant"), btn("Directions", nav("/dir")), action=nav("/detail"))
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.ListItem>(result)
+        assertIs<AmeNode.Btn>(result.trailing)
+        val trailingBtn = result.trailing as AmeNode.Btn
+        assertEquals("Directions", trailingBtn.label)
+        assertIs<AmeAction.Navigate>(trailingBtn.action)
+        assertEquals("/dir", (trailingBtn.action as AmeAction.Navigate).route)
+
+        assertNotNull(result.action)
+        assertIs<AmeAction.Navigate>(result.action)
+        assertEquals("/detail", (result.action as AmeAction.Navigate).route)
+    }
+
+    @Test
+    fun parseListItemPositionalActionIsIgnored() {
+        // action is named-only by design. A 5th positional arg should not be
+        // misinterpreted as an action.
+        val parser = AmeParser()
+        val result = parser.parse("""
+            root = list_item("T", "S", icon("x"), badge("B"), nav("/oops"))
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.ListItem>(result)
+        assertNull(result.action, "5th positional arg must NOT be treated as action; use action= named arg")
+    }
+
+    @Test
+    fun parseListItemWithIdentifierLeading() {
+        val result = parse("""
+            root = list_item("Title", "Sub", my_icon)
+            my_icon = icon("star")
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.ListItem>(result)
+        assertIs<AmeNode.Icon>(result.leading)
+        assertEquals("star", (result.leading as AmeNode.Icon).name)
+    }
+
+    @Test
+    fun parseListItemResolvesDataPaths() {
+        val result = parse("""
+            root = list_item(${"$"}name, ${"$"}addr, icon("restaurant"))
+            ---
+            {"name":"Luigi's","addr":"119 Mulberry St"}
+        """.trimIndent())
+
+        assertNotNull(result)
+        assertIs<AmeNode.ListItem>(result)
+        assertEquals("Luigi's", result.title)
+        assertEquals("119 Mulberry St", result.subtitle)
+    }
 }

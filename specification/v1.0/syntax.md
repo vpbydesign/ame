@@ -69,7 +69,7 @@ by parentheses containing zero or more arguments.
 header = txt("Hello World", title)
 ```
 
-The component name MUST be one of the 21 standard primitives defined in
+The component name MUST be one of the 22 standard primitives defined in
 [primitives.md](primitives.md), or a custom component name registered in the
 host app's catalog. See [Custom Components](#custom-components) below.
 
@@ -300,9 +300,9 @@ data_ref       = "$" , identifier , { "/" , identifier } ;
 component_name = standard_primitive | identifier ;
 standard_primitive = "col" | "row" | "txt" | "btn" | "card" | "badge"
                    | "icon" | "img" | "input" | "toggle" | "list"
-                   | "table" | "divider" | "spacer" | "progress"
-                   | "chart" | "code" | "accordion" | "carousel"
-                   | "callout" | "timeline" | "timeline_item" ;
+                   | "list_item" | "table" | "divider" | "spacer"
+                   | "progress" | "chart" | "code" | "accordion"
+                   | "carousel" | "callout" | "timeline" | "timeline_item" ;
 action_name    = "tool" | "uri" | "nav" | "copy" | "submit" ;
 
 (* === Tokens === *)
@@ -575,8 +575,9 @@ position alone.
 ### Standard Primitive Names
 
 `col`, `row`, `txt`, `btn`, `card`, `badge`, `icon`, `img`, `input`,
-`toggle`, `list`, `table`, `divider`, `spacer`, `progress`, `chart`,
-`code`, `accordion`, `carousel`, `callout`, `timeline`, `timeline_item`
+`toggle`, `list`, `list_item`, `table`, `divider`, `spacer`, `progress`,
+`chart`, `code`, `accordion`, `carousel`, `callout`, `timeline`,
+`timeline_item`
 
 ### Action Names
 
@@ -630,7 +631,7 @@ is a user-defined registry key with no enum semantics.
 
 ## Custom Components
 
-Host applications MAY register custom component names beyond the 21 standard
+Host applications MAY register custom component names beyond the 22 standard
 primitives. Custom components are rendered by the host app's renderer, not by
 the AME standard library.
 
@@ -708,7 +709,7 @@ AME differs from OpenUI Lang in the following ways:
 |--------|-----|-------------|
 | Target platform | Mobile (Compose, SwiftUI) | Web (React) |
 | Schema dependency | None | Zod schemas define argument order |
-| Component catalog | 21 built-in primitives + custom | Defined entirely by app's Zod schemas |
+| Component catalog | 22 built-in primitives + custom | Defined entirely by app's Zod schemas |
 | Actions | Inline `tool()`, `uri()`, `nav()`, `copy()`, `submit()` | Component callbacks |
 | Data binding | `$path` references + `---` separator | JavaScript variable references |
 | Template rendering | `each($array, template_id)` | Array `.map()` in JavaScript |
@@ -723,3 +724,4 @@ AME differs from OpenUI Lang in the following ways:
 |---------|------|---------|
 | 1.0 | 2026-04-05 | Initial specification — 15 standard primitives, EBNF grammar, error handling rules |
 | 1.1 | 2026-04-08 | Updated EBNF grammar to 21 standard primitives. Added ChartType, CalloutType, TimelineStatus, SemanticColor to reserved keywords. Maximum document length increased from 50 to 60 lines. AME_CUSTOM cross-reference added to Custom Components section. |
+| 1.4 | 2026-04-21 | Added `list_item` to standard primitives (22 total). Added `top` and `bottom` to the Align enum (valid for `crossAlign` on `row`/`col` only). |

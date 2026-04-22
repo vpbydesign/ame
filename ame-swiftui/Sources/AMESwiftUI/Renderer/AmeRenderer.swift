@@ -4,7 +4,7 @@ import Charts
 /// Recursive SwiftUI View that renders any AmeNode tree as native iOS UI.
 ///
 /// This is the main entry point for the AME SwiftUI renderer. It dispatches
-/// to type-specific private views via an exhaustive `switch` over all 24
+/// to type-specific private views via an exhaustive `switch` over all 25
 /// AmeNode cases. The Swift compiler enforces exhaustiveness — adding a new
 /// case to AmeNode will cause a compile error here until a rendering branch
 /// is added.
@@ -46,8 +46,8 @@ public struct AmeRenderer: View {
         switch node {
         case .col(let children, let align):
             renderCol(children, align: align)
-        case .row(let children, let align, let gap):
-            renderRow(children, align: align, gap: gap)
+        case .row(let children, let align, let gap, let weights, let crossAlign):
+            renderRow(children, align: align, gap: gap, weights: weights, crossAlign: crossAlign)
         case .txt(let text, let style, let maxLines, let color):
             renderTxt(text, style: style, maxLines: maxLines, color: color)
         case .img(let url, let height):
@@ -86,6 +86,9 @@ public struct AmeRenderer: View {
             renderCallout(type: type, content: content, title: title)
         case .timeline(let children):
             renderTimeline(children: children)
+        case .listItem(let title, let subtitle, let leading, let trailing, let action):
+            renderListItem(title: title, subtitle: subtitle, leading: leading,
+                           trailing: trailing, action: action)
         case .timelineItem(let title, let subtitle, let status):
             renderTimelineItem(title: title, subtitle: subtitle, status: status)
         case .ref:
@@ -111,24 +114,26 @@ public struct AmeRenderer: View {
     }
 
     @ViewBuilder
-    private func renderRow(_ children: [AmeNode], align: Align, gap: Int) -> some View {
+    private func renderRow(_ children: [AmeNode], align: Align, gap: Int,
+                           weights: [Int]?, crossAlign: Align?) -> some View {
+        let vAlignment = mapCrossAlignment(crossAlign)
         switch align {
         case .spaceBetween:
-            // gap ignored when align is spaceBetween — matches Compose Arrangement.SpaceBetween
-            HStack {
+            // gap ignored when align is spaceBetween
+            HStack(alignment: vAlignment) {
                 ForEach(Array(children.enumerated()), id: \.offset) { index, child in
-                    AmeRenderer(node: child, formState: formState, onAction: onAction, depth: depth + 1)
-                    if index < children.count - 1 {
+                    weightedChild(child, index: index, weights: weights)
+                    if index < children.count - 1 && weights == nil {
                         Spacer()
                     }
                 }
             }
         case .spaceAround:
-            // gap ignored when align is spaceAround — matches Compose Arrangement.SpaceAround
-            HStack {
+            // gap ignored when align is spaceAround
+            HStack(alignment: vAlignment) {
                 Spacer()
                 ForEach(Array(children.enumerated()), id: \.offset) { index, child in
-                    AmeRenderer(node: child, formState: formState, onAction: onAction, depth: depth + 1)
+                    weightedChild(child, index: index, weights: weights)
                     if index < children.count - 1 {
                         Spacer()
                     }
@@ -136,12 +141,70 @@ public struct AmeRenderer: View {
                 Spacer()
             }
         default:
-            HStack(alignment: .center, spacing: CGFloat(gap)) {
-                ForEach(Array(children.enumerated()), id: \.offset) { _, child in
-                    AmeRenderer(node: child, formState: formState, onAction: onAction, depth: depth + 1)
+            HStack(alignment: vAlignment, spacing: CGFloat(gap)) {
+                ForEach(Array(children.enumerated()), id: \.offset) { index, child in
+                    weightedChild(child, index: index, weights: weights)
                 }
             }
             .frame(maxWidth: align == .end ? .infinity : nil, alignment: mapFrameAlignment(align))
+        }
+    }
+
+    @ViewBuilder
+    private func weightedChild(_ child: AmeNode, index: Int, weights: [Int]?) -> some View {
+        let w: Int = {
+            guard let weights, index < weights.count else { return 0 }
+            return weights[index]
+        }()
+        if w > 0 {
+            AmeRenderer(node: child, formState: formState, onAction: onAction, depth: depth + 1)
+                .frame(maxWidth: .infinity)
+        } else {
+            AmeRenderer(node: child, formState: formState, onAction: onAction, depth: depth + 1)
+        }
+    }
+
+    private func mapCrossAlignment(_ align: Align?) -> VerticalAlignment {
+        switch align {
+        case .top: return .top
+        case .bottom: return .bottom
+        default: return .center
+        }
+    }
+
+    // MARK: - List Item
+
+    @ViewBuilder
+    private func renderListItem(title: String, subtitle: String?,
+                                leading: AmeNode?, trailing: AmeNode?,
+                                action: AmeAction?) -> some View {
+        let row = HStack(alignment: .top, spacing: 12) {
+            if let leading {
+                AmeRenderer(node: leading, formState: formState, onAction: onAction, depth: depth + 1)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.body)
+                if let subtitle {
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 0)
+            if let trailing {
+                // Nested click target: trailing interactive node intercepts before row gesture.
+                AmeRenderer(node: trailing, formState: formState, onAction: onAction, depth: depth + 1)
+                    .highPriorityGesture(TapGesture().onEnded { /* trailing owns its own action */ })
+            }
+        }
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+
+        if let action {
+            row.onTapGesture {
+                onAction(action)
+            }
+        } else {
+            row
         }
     }
 
@@ -220,6 +283,7 @@ public struct AmeRenderer: View {
             x: 0,
             y: CGFloat(elevation)
         )
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -231,6 +295,7 @@ public struct AmeRenderer: View {
             .padding(.vertical, 2)
             .background(color.map { AmeTheme.semanticColor($0).opacity(0.2) } ?? AmeTheme.badgeColor(variant))
             .cornerRadius(4)
+            .accessibilityLabel("\(label), \(variant.rawValue) indicator")
     }
 
     @ViewBuilder
@@ -335,7 +400,8 @@ public struct AmeRenderer: View {
 
     @ViewBuilder
     private func renderDataList(_ children: [AmeNode], dividers: Bool) -> some View {
-        VStack(spacing: 0) {
+        let spacing: CGFloat = dividers ? 8 : 12
+        VStack(spacing: spacing) {
             ForEach(Array(children.enumerated()), id: \.offset) { index, child in
                 if dividers && index > 0 {
                     Divider()
@@ -463,8 +529,7 @@ public struct AmeRenderer: View {
                 }
 
             case .sparkline:
-                // Sparkline intentionally ignores labels: axes are hidden per spec
-                // (primitives.md "ignored for sparkline" + Compose AmeChartRenderer parity).
+                // Sparkline intentionally ignores labels: axes are hidden per spec.
                 Chart {
                     ForEach(Array(data.enumerated()), id: \.offset) { index, value in
                         LineMark(
@@ -541,16 +606,14 @@ public struct AmeRenderer: View {
             EmptyView()
         } else {
             GeometryReader { geometry in
-                let itemWidth = geometry.size.width * 0.85
+                let itemWidth = min(geometry.size.width * 0.85, 340)
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 12) {
                         ForEach(Array(children.enumerated()), id: \.offset) { _, child in
                             AmeRenderer(node: child, formState: formState, onAction: onAction, depth: depth + 1)
-                                .frame(width: itemWidth)
+                                .frame(maxWidth: itemWidth)
                         }
                     }
-                    // Mirrors Compose: PaddingValues(start = 16.dp, end = node.peek.dp).
-                    // Trailing inset is the configured peek; no minimum clamp.
                     .padding(.leading, 16)
                     .padding(.trailing, CGFloat(peek))
                 }
@@ -653,6 +716,7 @@ public struct AmeRenderer: View {
         case .center: return .center
         case .end: return .trailing
         case .spaceBetween, .spaceAround: return .leading
+        case .top, .bottom: return .leading // cross-axis tokens are not valid here; fall back
         }
     }
 
@@ -662,20 +726,15 @@ public struct AmeRenderer: View {
         case .center: return .center
         case .end: return .trailing
         case .spaceBetween, .spaceAround: return .leading
+        case .top, .bottom: return .leading
         }
     }
 }
 
 // MARK: - Accordion View (requires @State for expand/collapse)
 
-/// Bug #18 (WP#5): the previous implementation captured `node.expanded`
-/// only at first composition via `State(initialValue:)`, so server-pushed
-/// updates were silently ignored. The fix mirrors the WP#4 Bug 5
-/// separate-state pattern: a non-`@State` `nodeExpanded` field tracks the
-/// latest external value, and `.onChange(of: nodeExpanded)` syncs the
-/// `@State` snapshot when the host re-renders the parent with a new
-/// AmeNode.Accordion. Local user taps still flip `isExpanded` immediately
-/// and persist until the next external change.
+/// External `expanded` changes are tracked via `.onChange(of: nodeExpanded)`;
+/// local user taps persist until the next external change.
 private struct AmeAccordionView: View {
     let title: String
     let children: [AmeNode]

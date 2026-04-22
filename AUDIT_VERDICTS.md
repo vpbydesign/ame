@@ -993,6 +993,62 @@ for the lifecycle rules that govern entries in this document.
 - Conformance impact: **none** — pure renderer bug; no JSON output change.
 - Notes: Flutter-specific architectural finding from WP#7 Phase D discovery (no Kotlin/Swift analog because Compose `OutlinedTextField` and SwiftUI `TextField` manage their own controller equivalents).
 
+## Bug 39: DataList items render with zero vertical rhythm across all runtimes
+
+- Audit claim severity: LOW (visual polish)
+- Verified severity: MEDIUM (accessibility + readability — rows flush together make tap targets ambiguous on mobile)
+- Platforms: Kotlin Compose, SwiftUI, Flutter
+- Verifying tests:
+  - `ame-compose/.../AuditedBugRegressionTest.kt::testDataListHasVerticalSpacing` (source-structural)
+  - `ame-swiftui/.../AuditedSwiftUIBugTests.swift::testDataListHasVerticalSpacing` (source-structural)
+  - `ame-flutter-ui/.../audited_ui_bug_regression_test.dart::Bug 39: _renderDataList uses dividers-conditional spacing` (source-structural)
+- Status: **REAL — FIXED in v1.4**
+- Evidence: Testing integration report. Pre-fix `AmeDataList` (Compose), `renderDataList` (SwiftUI), and `_renderDataList` (Flutter) used a bare Column/VStack with no vertical arrangement; list items were flush against each other and dividers had no visual breathing room. Fixed in v1.4 by adding a dividers-conditional 8dp/12dp spacing across all three runtimes: `Arrangement.spacedBy(if (node.dividers) 8.dp else 12.dp)` (Compose), `VStack(spacing: dividers ? 8 : 12)` (SwiftUI), and `SizedBox(height: ...)` separators (Flutter). Values match Material 3's LazyColumn default item spacing.
+- Conformance impact: **none** — renderer spacing is not serialized.
+- Notes: v1.4 finding. Defaults are intentionally not host-configurable in v1.4; add to `AmeThemeConfig` if host demand surfaces.
+
+## Bug 40: Carousel items grow beyond comfortable widths on tablets and foldables
+
+- Audit claim severity: LOW (visual polish)
+- Verified severity: MEDIUM (Testing regression — cards wider than 400dp looked unbalanced and broke content hierarchy)
+- Platforms: Kotlin Compose, SwiftUI, Flutter
+- Verifying tests:
+  - `ame-compose/.../AuditedBugRegressionTest.kt::testCarouselItemHasMaxWidthClamp` (source-structural)
+  - `ame-swiftui/.../AuditedSwiftUIBugTests.swift::testCarouselItemHasMaxWidthClamp` (source-structural)
+  - `ame-flutter-ui/.../audited_ui_bug_regression_test.dart::Bug 40: _renderCarousel clamps item width to 340dp max` (source-structural)
+- Status: **REAL — FIXED in v1.4**
+- Evidence: Testing integration report from Pixel Fold testing. Pre-fix carousel items used `fillParentMaxWidth(0.85f)` (Compose), `width * 0.85` (SwiftUI), and `MediaQuery.of(context).size.width * 0.85` (Flutter) with no upper bound. On large form factors, this produced cards wider than 400dp, breaking content hierarchy. Fixed in v1.4 by clamping each item to a 340dp max: `Modifier.fillParentMaxWidth(0.85f).widthIn(max = 340.dp)` (Compose), `min(geometry.size.width * 0.85, 340)` (SwiftUI), and `w > 340 ? 340.0 : w` (Flutter). 340dp matches Material 3's recommended max card width for content.
+- Conformance impact: **none** — renderer width clamps are not serialized.
+- Notes: v1.4 finding. If host demand for configurability surfaces, expose as `maxItemWidth` on `AmeNode.Carousel` in v1.5.
+
+## Bug 41a: Badge variant not announced by screen readers across all runtimes
+
+- Audit claim severity: LOW (accessibility polish)
+- Verified severity: MEDIUM (accessibility — TalkBack/VoiceOver read only the label with no indication of the status indicator's variant)
+- Platforms: Kotlin Compose, SwiftUI, Flutter
+- Verifying tests:
+  - `ame-compose/.../AuditedBugRegressionTest.kt::testBadgeAccessibilityIncludesVariant` (source-structural)
+  - `ame-swiftui/.../AuditedSwiftUIBugTests.swift::testBadgeAccessibilityIncludesVariant` (source-structural)
+  - `ame-flutter-ui/.../audited_ui_bug_regression_test.dart::Bug 41a: _renderBadge announces variant via Semantics` (source-structural)
+- Status: **REAL — FIXED in v1.4**
+- Evidence: Testing accessibility audit. Pre-fix `AmeBadge`/`renderBadge`/`_renderBadge` produced a colored label with no semantic annotation. A user hearing "4.5" had no way to know the element was an info indicator vs an error indicator. Fixed in v1.4 by setting `contentDescription = "${label}, ${variant.name} indicator"` (Compose), `.accessibilityLabel("\(label), \(variant) indicator")` (SwiftUI), and `Semantics(label: '${label}, ${variant.value} indicator')` (Flutter).
+- Conformance impact: **none** — accessibility annotations are not serialized.
+- Notes: v1.4 finding. Complements the spec accessibility note (primitives.md §badge) which previously described the intent but not the normative string.
+
+## Bug 41b: Card children not grouped as a single semantics node across all runtimes
+
+- Audit claim severity: LOW (accessibility polish)
+- Verified severity: MEDIUM (accessibility — cards were announced as a sequence of independent elements, breaking the spec note that a card SHOULD be a single semantics unit)
+- Platforms: Kotlin Compose, SwiftUI, Flutter
+- Verifying tests:
+  - `ame-compose/.../AuditedBugRegressionTest.kt::testCardMergesSemanticsDescendants` (source-structural)
+  - `ame-swiftui/.../AuditedSwiftUIBugTests.swift::testCardCombinesAccessibilityChildren` (source-structural)
+  - `ame-flutter-ui/.../audited_ui_bug_regression_test.dart::Bug 41b: _renderCard merges semantics descendants` (source-structural)
+- Status: **REAL — FIXED in v1.4**
+- Evidence: Testing accessibility audit. Pre-fix `AmeCard`/`renderCard`/`_renderCard` did not wrap children in a semantic grouping primitive, causing screen readers to read each child as a focusable element. The spec (§card accessibility) already described the intended behavior. Fixed in v1.4 by wrapping in a merge primitive per runtime: `Modifier.semantics(mergeDescendants = true) {}` (Compose), `.accessibilityElement(children: .combine)` (SwiftUI), `MergeSemantics` (Flutter). Interactive children within the card (e.g., buttons) remain individually focusable.
+- Conformance impact: **none** — accessibility annotations are not serialized.
+- Notes: v1.4 finding.
+
 ---
 
 ## Phase 2 fix order (driven by verified severity)
@@ -1031,6 +1087,10 @@ in this order:
    - ~~Bug 36 — Flutter accordion expanded reactivity (ame-flutter-ui; `didUpdateWidget` syncs `_isExpanded` + chevron animation)~~ — **FIXED in v1.3 WP#7**
    - ~~Bug 37 — Flutter theme dark-mode adaptation (ame-flutter-ui; Path D mirroring Compose Material 3 hex values)~~ — **FIXED in v1.3 WP#7**
    - ~~Bug 38 — Flutter date/time picker controller hoisting (ame-flutter-ui; StatefulWidget + initState/dispose + formState listener)~~ — **FIXED in v1.3 WP#7**
+   - ~~Bug 39 — DataList items render with zero vertical rhythm (all runtimes; 8dp/12dp dividers-conditional spacing)~~ — **FIXED in v1.4 WP#9**
+   - ~~Bug 40 — Carousel items grow beyond comfortable widths on tablets/foldables (all runtimes; 340dp max clamp)~~ — **FIXED in v1.4 WP#9**
+   - ~~Bug 41a — Badge variant not announced by screen readers (all runtimes; contentDescription / accessibilityLabel / Semantics label includes variant)~~ — **FIXED in v1.4 WP#9**
+   - ~~Bug 41b — Card children not grouped as a single semantics node (all runtimes; mergeDescendants / .combine / MergeSemantics)~~ — **FIXED in v1.4 WP#9**
 4. **LOW**
    - ~~Bug 10 — chart color default documentation drift (spec or AST)~~ — **FIXED in v1.2 WP#2**
 5. **TOOLING**

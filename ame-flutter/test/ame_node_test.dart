@@ -628,4 +628,109 @@ void main() {
       ]));
     });
   });
+
+  // ── v1.4 Row weights / crossAlign ──────────────────────────────────
+
+  group('v1.4 Row Layout Extensions', () {
+    test('roundTripRowWithWeights', () {
+      assertRoundTrip(const AmeRow(
+        children: [AmeTxt(text: 'Wide'), AmeTxt(text: 'Narrow')],
+        weights: [1, 0],
+      ));
+    });
+
+    test('roundTripRowWithCrossAlign', () {
+      assertRoundTrip(const AmeRow(
+        children: [AmeTxt(text: 'A'), AmeTxt(text: 'B')],
+        crossAlign: Align.top,
+      ));
+    });
+
+    test('roundTripRowWithWeightsAndCrossAlign', () {
+      assertRoundTrip(const AmeRow(
+        children: [AmeTxt(text: 'A'), AmeTxt(text: 'B')],
+        align: Align.spaceBetween,
+        gap: 12,
+        weights: [1, 1],
+        crossAlign: Align.bottom,
+      ));
+    });
+
+    test('roundTripRowDefaultsOmitsNewFields', () {
+      // v1.3 conformance preservation: a Row with only children must serialize
+      // byte-identically to v1.3 output (no weights, no cross_align).
+      const node = AmeRow(children: [AmeTxt(text: 'Item')]);
+      assertRoundTrip(node);
+      final json = AmeSerializer.toJson(node);
+      expect(json.contains('weights'), isFalse,
+          reason: 'Default weights must not be encoded: $json');
+      expect(json.contains('cross_align'), isFalse,
+          reason: 'Default cross_align must not be encoded: $json');
+    });
+
+    test('rowCrossAlignSerializesAsSnakeCase', () {
+      const node = AmeRow(
+        children: [AmeTxt(text: 'A')],
+        crossAlign: Align.top,
+      );
+      final json = AmeSerializer.toJson(node);
+      expect(json.contains('"cross_align"'), isTrue,
+          reason: 'crossAlign must serialize as snake_case: $json');
+      expect(json.contains('"crossAlign"'), isFalse,
+          reason: 'camelCase must not appear in JSON: $json');
+    });
+
+    test('roundTripAlignTopBottom', () {
+      // v1.4 added Align.top and Align.bottom; verify both via Row.crossAlign.
+      for (final align in [Align.top, Align.bottom]) {
+        assertRoundTrip(AmeRow(
+          children: const [AmeTxt(text: 'X')],
+          crossAlign: align,
+        ));
+      }
+    });
+  });
+
+  // ── v1.4 list_item primitive ───────────────────────────────────────
+
+  group('v1.4 list_item', () {
+    test('roundTripListItemFull', () {
+      assertRoundTrip(const AmeListItem(
+        title: 'Pizza Place',
+        subtitle: '71 Mulberry St',
+        leading: AmeIcon(name: 'restaurant'),
+        trailing: AmeBadge(label: '4.5', variant: BadgeVariant.info),
+        action: AmeNavigate(route: '/detail'),
+      ));
+    });
+
+    test('roundTripListItemMinimal', () {
+      const node = AmeListItem(title: 'Title only');
+      assertRoundTrip(node);
+      final json = AmeSerializer.toJson(node);
+      expect(json.contains('subtitle'), isFalse,
+          reason: 'Default subtitle must not be encoded: $json');
+      expect(json.contains('leading'), isFalse,
+          reason: 'Default leading must not be encoded: $json');
+      expect(json.contains('trailing'), isFalse,
+          reason: 'Default trailing must not be encoded: $json');
+      expect(json.contains('"action"'), isFalse,
+          reason: 'Default action must not be encoded: $json');
+    });
+
+    test('roundTripListItemNestedClickTargetCase', () {
+      // The NORMATIVE nested click target case (§list_item): row-level action
+      // PLUS a trailing AmeBtn with its own action. Both must survive round-trip.
+      assertRoundTrip(const AmeListItem(
+        title: 'Pizza Place',
+        subtitle: '71 Mulberry St',
+        leading: AmeIcon(name: 'restaurant'),
+        trailing: AmeBtn(
+          label: 'Directions',
+          action: AmeNavigate(route: '/dir'),
+        ),
+        action: AmeNavigate(route: '/detail'),
+      ));
+    });
+  });
 }

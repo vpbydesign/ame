@@ -1,4 +1,3 @@
 // conformance/56-callout-with-color.ame
-// Tests: callout `color=` named arg round-trips through parse + serialize (Bug 6).
-// Pre-WP#2 the color was silently dropped; post-WP#2 the JSON includes "color":"warning".
+// Tests: callout `color=` named arg round-trips through parse + serialize.
 root = callout(warning, "Disk space low", color=warning)

@@ -962,4 +962,154 @@ void main() {
       expect(chart2.valuesPath, isNull);
     });
   });
+
+  // ── v1.4 Row weights / crossAlign ──────────────────────────────────
+
+  group('v1.4 Row Layout Extensions', () {
+    test('parseRowWithWeights', () {
+      final result = parse('root = row([a, b], weights=[1, 0])\na = txt("Wide")\nb = txt("Narrow")');
+      expect(result, isA<AmeRow>());
+      final row = result as AmeRow;
+      expect(row.weights, [1, 0]);
+      expect(row.crossAlign, isNull);
+    });
+
+    test('parseRowWithCrossAlign', () {
+      final result = parse('root = row([a, b], crossAlign=top)\na = txt("A")\nb = txt("B")');
+      expect(result, isA<AmeRow>());
+      final row = result as AmeRow;
+      expect(row.crossAlign, Align.top);
+      expect(row.weights, isNull);
+    });
+
+    test('parseRowWithCrossAlignSnakeCase', () {
+      final result = parse('root = row([a, b], cross_align=bottom)\na = txt("A")\nb = txt("B")');
+      expect(result, isA<AmeRow>());
+      expect((result as AmeRow).crossAlign, Align.bottom);
+    });
+
+    test('parseRowWithWeightsAndCrossAlign', () {
+      final result = parse(
+        'root = row([a, b], space_between, 12, weights=[1, 1], crossAlign=top)\na = txt("A")\nb = txt("B")',
+      );
+      expect(result, isA<AmeRow>());
+      final row = result as AmeRow;
+      expect(row.align, Align.spaceBetween);
+      expect(row.gap, 12);
+      expect(row.weights, [1, 1]);
+      expect(row.crossAlign, Align.top);
+    });
+
+    test('parseRowWeightsLengthMismatchFallsBack', () {
+      final parser = AmeParser();
+      final result = parser.parse(
+        'root = row([a, b, c], weights=[1, 0])\na = txt("A")\nb = txt("B")\nc = txt("C")',
+      );
+      expect(result, isA<AmeRow>());
+      final row = result as AmeRow;
+      expect(row.weights, isNull,
+          reason: 'Length mismatch must fall back to null (intrinsic)');
+      expect(parser.warnings.any((w) => w.contains('weights length')), isTrue,
+          reason: 'Mismatch must log a warning. warnings: ${parser.warnings}');
+    });
+
+    test('parseRowWithoutNewFieldsIsBackwardCompatible', () {
+      final result = parse('root = row([a, b])\na = txt("A")\nb = txt("B")');
+      expect(result, isA<AmeRow>());
+      final row = result as AmeRow;
+      expect(row.weights, isNull);
+      expect(row.crossAlign, isNull);
+      expect(row.align, Align.start);
+      expect(row.gap, 8);
+    });
+  });
+
+  // ── v1.4 list_item primitive ───────────────────────────────────────
+
+  group('v1.4 list_item', () {
+    test('parseListItemBasic', () {
+      final result = parse(
+        'root = list_item("Pizza Place", "71 Mulberry St", icon("restaurant"), badge("4.5", info))',
+      );
+      expect(result, isA<AmeListItem>());
+      final li = result as AmeListItem;
+      expect(li.title, 'Pizza Place');
+      expect(li.subtitle, '71 Mulberry St');
+      expect(li.leading, isA<AmeIcon>());
+      expect((li.leading as AmeIcon).name, 'restaurant');
+      expect(li.trailing, isA<AmeBadge>());
+      expect((li.trailing as AmeBadge).label, '4.5');
+      expect((li.trailing as AmeBadge).variant, BadgeVariant.info);
+      expect(li.action, isNull);
+    });
+
+    test('parseListItemMinimal', () {
+      final result = parse('root = list_item("Title only")');
+      expect(result, isA<AmeListItem>());
+      final li = result as AmeListItem;
+      expect(li.title, 'Title only');
+      expect(li.subtitle, isNull);
+      expect(li.leading, isNull);
+      expect(li.trailing, isNull);
+      expect(li.action, isNull);
+    });
+
+    test('parseListItemWithAction', () {
+      final result = parse('root = list_item("Settings", action=nav("/settings"))');
+      expect(result, isA<AmeListItem>());
+      final li = result as AmeListItem;
+      expect(li.title, 'Settings');
+      expect(li.action, isA<AmeNavigate>());
+      expect((li.action as AmeNavigate).route, '/settings');
+    });
+
+    test('parseListItemWithTrailingBtnAndRowAction', () {
+      // Nested click target case: row has its own action and trailing has a btn
+      // with its own action. Parser must capture both independently; the
+      // renderer is responsible for tap isolation.
+      final result = parse(
+        'root = list_item("Pizza Place", "71 Mulberry St", icon("restaurant"), btn("Directions", nav("/dir")), action=nav("/detail"))',
+      );
+      expect(result, isA<AmeListItem>());
+      final li = result as AmeListItem;
+      expect(li.trailing, isA<AmeBtn>());
+      final btn = li.trailing as AmeBtn;
+      expect(btn.label, 'Directions');
+      expect(btn.action, isA<AmeNavigate>());
+      expect((btn.action as AmeNavigate).route, '/dir');
+      expect(li.action, isA<AmeNavigate>());
+      expect((li.action as AmeNavigate).route, '/detail');
+    });
+
+    test('parseListItemPositionalActionIsIgnored', () {
+      // action is named-only by design. A 5th positional arg must NOT be
+      // misinterpreted as an action.
+      final result = parse(
+        'root = list_item("T", "S", icon("x"), badge("B"), nav("/oops"))',
+      );
+      expect(result, isA<AmeListItem>());
+      expect((result as AmeListItem).action, isNull,
+          reason: '5th positional arg must NOT be treated as action; use action= named arg');
+    });
+
+    test('parseListItemWithIdentifierLeading', () {
+      final result = parse(
+        'root = list_item("Title", "Sub", my_icon)\nmy_icon = icon("star")',
+      );
+      expect(result, isA<AmeListItem>());
+      final li = result as AmeListItem;
+      expect(li.leading, isA<AmeIcon>());
+      expect((li.leading as AmeIcon).name, 'star');
+    });
+
+    test('parseListItemResolvesDataPaths', () {
+      final result = parse(
+        'root = list_item(\$name, \$addr, icon("restaurant"))\n---\n{"name":"Luigi\'s","addr":"119 Mulberry St"}',
+      );
+      expect(result, isA<AmeListItem>());
+      final li = result as AmeListItem;
+      expect(li.title, "Luigi's");
+      expect(li.subtitle, '119 Mulberry St');
+    });
+  });
 }

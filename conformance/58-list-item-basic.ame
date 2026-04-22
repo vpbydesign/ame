@@ -1,0 +1,5 @@
+// conformance/58-list-item-basic.ame
+// Tests: list_item primitive with all 5 fields exercised — title,
+// subtitle, leading icon, trailing badge. action is omitted (named-only,
+// see fixture 59 for the action case).
+root = list_item("Pizza Place", "71 Mulberry St", icon("restaurant"), badge("4.5", info))

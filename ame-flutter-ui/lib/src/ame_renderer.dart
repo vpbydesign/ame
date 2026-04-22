@@ -12,7 +12,7 @@ import 'ame_theme.dart';
 /// Recursive widget that renders any [AmeNode] tree as native Material 3 UI.
 ///
 /// This is the main entry point for the AME Flutter renderer. It dispatches
-/// to type-specific private builders via an exhaustive `switch` over all 24
+/// to type-specific private builders via an exhaustive `switch` over all 25
 /// [AmeNode] sealed subtypes. The Dart compiler enforces exhaustiveness —
 /// adding a new subtype to [AmeNode] will cause a compile error here.
 class AmeRenderer extends StatelessWidget {
@@ -77,6 +77,7 @@ class AmeRenderer extends StatelessWidget {
       AmeCallout() => _renderCallout(context, node),
       AmeTimeline() => _renderTimeline(context, node),
       AmeTimelineItem() => _renderTimelineItemStandalone(context, node),
+      AmeListItem() => _renderListItem(context, node),
       AmeRef() => const AmeSkeleton(height: 48),
       AmeEach() => const AmeSkeleton(height: 120),
     };
@@ -100,6 +101,7 @@ class AmeRenderer extends StatelessWidget {
       Align.center => CrossAxisAlignment.center,
       Align.end => CrossAxisAlignment.end,
       Align.spaceBetween || Align.spaceAround => CrossAxisAlignment.start,
+      Align.top || Align.bottom => CrossAxisAlignment.start,
     };
 
     final children = <Widget>[];
@@ -122,22 +124,60 @@ class AmeRenderer extends StatelessWidget {
       Align.end => MainAxisAlignment.end,
       Align.spaceBetween => MainAxisAlignment.spaceBetween,
       Align.spaceAround => MainAxisAlignment.spaceAround,
+      Align.top || Align.bottom => MainAxisAlignment.start,
     };
 
+    final crossAxis = switch (node.crossAlign) {
+      Align.top => CrossAxisAlignment.start,
+      Align.bottom => CrossAxisAlignment.end,
+      _ => CrossAxisAlignment.center,
+    };
+
+    final weights = node.weights;
     final children = <Widget>[];
     final useGap =
         node.align != Align.spaceBetween && node.align != Align.spaceAround;
     for (var i = 0; i < node.children.length; i++) {
-      if (i > 0 && useGap) {
+      if (i > 0 && useGap && weights == null) {
         children.add(SizedBox(width: node.gap.toDouble()));
       }
-      children.add(_child(node.children[i]));
+      final child = _child(node.children[i]);
+      final w = (weights != null && i < weights.length) ? weights[i] : 0;
+      if (w > 0) {
+        children.add(Expanded(flex: w, child: child));
+        if (i < node.children.length - 1 && useGap) {
+          children.add(SizedBox(width: node.gap.toDouble()));
+        }
+      } else {
+        children.add(child);
+      }
     }
 
     return Row(
       mainAxisAlignment: mainAlign,
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: crossAxis,
       children: children,
+    );
+  }
+
+  // ── List Item ──────────────────────────────────────────────────────
+
+  Widget _renderListItem(BuildContext context, AmeListItem node) {
+    final leading =
+        node.leading != null ? _child(node.leading!) : null;
+    // The nested click target rule is handled natively by Flutter's ListTile:
+    // `trailing` widgets that own their own gesture detectors (e.g. IconButton,
+    // AmeBtn wrapping an InkWell) consume taps before ListTile.onTap fires.
+    final trailing =
+        node.trailing != null ? _child(node.trailing!) : null;
+    return MergeSemantics(
+      child: ListTile(
+        leading: leading,
+        title: Text(node.title),
+        subtitle: node.subtitle != null ? Text(node.subtitle!) : null,
+        trailing: trailing,
+        onTap: node.action != null ? () => onAction(node.action!) : null,
+      ),
     );
   }
 
@@ -191,16 +231,18 @@ class AmeRenderer extends StatelessWidget {
       children.add(_child(node.children[i]));
     }
 
-    return SizedBox(
-      width: double.infinity,
-      child: Card(
-        elevation: node.elevation.toDouble(),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: children,
+    return MergeSemantics(
+      child: SizedBox(
+        width: double.infinity,
+        child: Card(
+          elevation: node.elevation.toDouble(),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
+            ),
           ),
         ),
       ),
@@ -211,16 +253,21 @@ class AmeRenderer extends StatelessWidget {
     final bgColor = node.color != null
         ? AmeTheme.semanticColor(context, node.color!)
         : AmeTheme.badgeColor(context, node.variant);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      margin: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        node.label,
-        style: Theme.of(context).textTheme.labelSmall,
+    final variantName = node.variant.value;
+    return Semantics(
+      label: '${node.label}, $variantName indicator',
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          node.label,
+          style: Theme.of(context).textTheme.labelSmall,
+        ),
       ),
     );
   }
@@ -302,9 +349,18 @@ class AmeRenderer extends StatelessWidget {
   // ── Data Primitives ────────────────────────────────────────────────
 
   Widget _renderDataList(BuildContext context, AmeDataList node) {
+    final spacing = node.dividers ? 8.0 : 12.0;
     final children = <Widget>[];
     for (var i = 0; i < node.children.length; i++) {
-      if (node.dividers && i > 0) children.add(const Divider());
+      if (i > 0) {
+        if (node.dividers) {
+          children.add(SizedBox(height: spacing));
+          children.add(const Divider());
+          children.add(SizedBox(height: spacing));
+        } else {
+          children.add(SizedBox(height: spacing));
+        }
+      }
       children.add(_child(node.children[i]));
     }
     return SizedBox(
@@ -431,8 +487,10 @@ class AmeRenderer extends StatelessWidget {
         itemCount: node.children.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
+          final w = MediaQuery.of(context).size.width * 0.85;
+          final clamped = w > 340 ? 340.0 : w;
           return SizedBox(
-            width: MediaQuery.of(context).size.width * 0.85,
+            width: clamped,
             child: _child(node.children[index]),
           );
         },
@@ -641,14 +699,8 @@ class _AmeAccordionWidgetState extends State<_AmeAccordionWidget>
     );
   }
 
-  /// Bug 36 fix (Flutter analog of v1.2 Bug 18): the previous
-  /// implementation captured `widget.node.expanded` once in `initState`,
-  /// so server-pushed updates to the accordion's expanded state were
-  /// silently ignored. This override syncs `_isExpanded` and the
-  /// chevron animation when the parent re-renders with a different
-  /// `node.expanded`. Local user taps still flip `_isExpanded`
-  /// immediately and persist until the next external change. Mirrors
-  /// Compose `LaunchedEffect(node.expanded)` semantics from v1.2 WP#5.
+  /// External `expanded` changes are tracked via `didUpdateWidget`;
+  /// local user taps persist until the next external change.
   @override
   void didUpdateWidget(covariant _AmeAccordionWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -795,18 +847,10 @@ class _AmeInputTextFieldState extends State<_AmeInputTextField> {
   }
 }
 
-/// Bug 38 fix (WP#7 Phase D discovery): the pre-fix StatelessWidget
-/// constructed a fresh [TextEditingController] inside `build()`, which
-/// (1) lost cursor/selection state on every `formState.notifyListeners()`,
-/// (2) generated GC churn from per-build allocation, and
-/// (3) broke IME composition on Android.
-///
-/// The post-fix StatefulWidget hoists the controller into `initState`,
-/// disposes in `dispose`, and synchronizes the controller text via a
-/// [ChangeNotifier] listener on [formState] plus `didUpdateWidget` for
-/// the rare case where the host swaps a different node into the same
-/// position. Pattern mirrors `_AmeInputTextField` which already follows
-/// the correct lifecycle.
+/// StatefulWidget that hoists the controller into `initState` and disposes
+/// in `dispose`. Synchronizes the controller text via a [ChangeNotifier]
+/// listener on [formState] plus `didUpdateWidget` for the rare case where
+/// the host swaps a different node into the same position.
 class _AmeInputDatePicker extends StatefulWidget {
   final AmeInput node;
   final AmeFormState formState;
@@ -885,9 +929,9 @@ class _AmeInputDatePickerState extends State<_AmeInputDatePicker> {
   }
 }
 
-/// Bug 38 fix (WP#7 Phase D discovery): see [_AmeInputDatePicker] for the
-/// rationale; `_AmeInputTimePicker` follows the identical lifecycle
-/// pattern with `showTimePicker` instead of `showDatePicker`.
+/// See [_AmeInputDatePicker] for the lifecycle rationale;
+/// `_AmeInputTimePicker` follows the identical pattern with
+/// `showTimePicker` instead of `showDatePicker`.
 class _AmeInputTimePicker extends StatefulWidget {
   final AmeInput node;
   final AmeFormState formState;

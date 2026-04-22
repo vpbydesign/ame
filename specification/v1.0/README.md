@@ -1,8 +1,8 @@
-# AME Specification — Version 1.3
+# AME Specification — Version 1.4
 
 > Directory name `v1.0` is the layout version, retained for backlink stability across releases. Spec contents reflect the current AME version (see Version History at the bottom of this page).
 
-The AME v1.3 specification defines a compact, streaming-first syntax for
+The AME v1.4 specification defines a compact, streaming-first syntax for
 describing interactive user interfaces, designed for LLM generation and
 native mobile rendering.
 
@@ -11,7 +11,7 @@ native mobile rendering.
 | Document | Description |
 |----------|-------------|
 | [syntax.md](syntax.md) | Line-oriented syntax rules and EBNF grammar |
-| [primitives.md](primitives.md) | 21 standard UI primitives with argument tables |
+| [primitives.md](primitives.md) | 22 standard UI primitives with argument tables |
 | [actions.md](actions.md) | 5 action types (tool, uri, nav, copy, submit) |
 | [streaming.md](streaming.md) | Progressive rendering with forward references |
 | [data-binding.md](data-binding.md) | $path references, --- separator, each() templates |
@@ -23,7 +23,7 @@ native mobile rendering.
 ## Conformance
 
 AME defines three conformance levels: Core, Streaming, and Strict.
-The complete conformance methodology, including the 57-case test catalog,
+The complete conformance methodology, including the 62-case test catalog,
 self-verification procedure, the multi-runtime extension procedure, and
 rules for adding or changing conformance tests, is consolidated in
 [conformance.md](conformance.md).
@@ -62,4 +62,5 @@ INCONCLUSIVE) lives at
 | 1.0 | 2026-04-05 | Superseded by v1.1 |
 | 1.1 | 2026-04-11 | Superseded by v1.2 |
 | 1.2 | 2026-04-18 | Superseded by v1.3 |
-| 1.3 | 2026-04-XX | Current. Flutter joins as third reference runtime; Flutter port aligned with v1.2 audit history; one architectural Flutter-specific finding fixed; one phantom audit claim refuted. |
+| 1.3 | 2026-04-18 | Superseded by v1.4 |
+| 1.4 | 2026-04-21 | Current. Adds `list_item` primitive (22 total) with normative nested click target rule; extends `row` with `weights` (per-child flex distribution) and `crossAlign` (vertical alignment) named arguments; adds `top` and `bottom` to the Align enum; renderer-quality fixes (Bugs 39, 40, 41a, 41b) across all three runtimes. No `BREAKING-CONFORMANCE` — all 57 v1.3 conformance fixtures byte-identical; 5 new fixtures added (58–62) for total 62 cases. |

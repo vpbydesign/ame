@@ -91,15 +91,13 @@ private val MULTI_SERIES_ALPHAS = floatArrayOf(1.0f, 0.75f, 0.55f, 0.4f, 0.3f)
 // ── Chart Math (extracted for direct unit testing) ─────────────────────────
 
 /**
- * Pure chart math utilities, lifted out of the @Composable layer so audit
- * regression tests can call production code directly instead of mirroring
- * formulas. Coordinate convention matches Compose Canvas: y=0 at the top,
+ * Pure chart math utilities, lifted out of the @Composable layer so tests
+ * can call production code directly. Coordinate convention: y=0 at the top,
  * y=1 at the bottom, in chart-relative units.
  *
- * Resolves Bug #4 (a/b/c/d) by guaranteeing that every chart that has a
- * mix of positive and negative values draws against a visible baseline at
- * value=0, and that multi-series charts share an X stride so the same
- * index of every series falls at the same x coordinate.
+ * Guarantees that charts with a mix of positive and negative values draw
+ * against a visible baseline at value=0, and that multi-series charts share
+ * an X stride so the same index of every series falls at the same x coordinate.
  */
 internal object ChartMath {
 
@@ -156,7 +154,7 @@ internal object ChartMath {
     /**
      * Shared X stride for multi-series charts. Using the LONGEST series'
      * length means index N of any series falls at the same X coordinate,
-     * even when series lengths differ. Resolves Bug #4d.
+     * even when series lengths differ.
      */
     fun computeSharedStepX(width: Float, horizontalPadding: Float, maxPoints: Int): Float {
         val divisor = (maxPoints - 1).coerceAtLeast(1)
@@ -234,7 +232,7 @@ private fun LineChart(
 ) {
     val allSeries = if (!series.isNullOrEmpty()) series else if (data.isNotEmpty()) listOf(data) else return
 
-    // Bug #4c: a line chart needs at least one series with >= 2 points to
+    // A line chart needs at least one series with >= 2 points to
     // draw anything meaningful. If every series is too short (e.g. a single
     // point), render the documented empty-state instead of the previous
     // silent blank canvas.
@@ -256,7 +254,7 @@ private fun LineChart(
         val bottomPadding = if (labelTexts.isNotEmpty()) 20f else 4f
         val chartHeight = size.height - bottomPadding
         val horizontalPadding = 16f
-        // Bug #4d: stride is computed from the LONGEST series so index N of
+        // Stride is computed from the LONGEST series so index N of
         // every series maps to the same x coordinate. Series shorter than
         // maxPoints simply end earlier in the chart width.
         val stepX = ChartMath.computeSharedStepX(size.width, horizontalPadding, maxPoints)

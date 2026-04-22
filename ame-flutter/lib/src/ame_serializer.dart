@@ -5,11 +5,10 @@ import 'ame_node.dart';
 
 /// Diagnostic outcome of [AmeSerializer.fromJsonOrError].
 ///
-/// Resolves Bug 35 (Flutter analog of v1.2 Bug 15): the legacy nullable
-/// [AmeSerializer.fromJson] swallows every failure into a single `null`
-/// return, so hosts cannot distinguish invalid JSON, schema mismatch,
-/// missing root, or unexpected runtime failures. This API is additive;
-/// the legacy nullable APIs stay unchanged.
+/// The legacy nullable [AmeSerializer.fromJson] swallows every failure into
+/// a single `null` return, so hosts cannot distinguish invalid JSON, schema
+/// mismatch, missing root, or unexpected runtime failures. This API is
+/// additive; the legacy nullable APIs stay unchanged.
 sealed class AmeDecodeResult {
   const AmeDecodeResult();
 
@@ -70,10 +69,9 @@ final class AmeActionDecodeFailure extends AmeActionDecodeResult {
 /// Serializes and deserializes AmeNode trees and AmeAction objects to/from JSON.
 ///
 /// Key ordering: all JSON output uses sorted keys (alphabetical) to produce
-/// canonical output matching Kotlin's canonicalize() and Swift's .sortedKeys,
-/// aligning with RFC 8785 (JSON Canonicalization Scheme) for ASCII property names.
+/// canonical output per RFC 8785 (JSON Canonicalization Scheme).
 ///
-/// Default values are omitted from output (matching Kotlin's encodeDefaults = false).
+/// Default values are omitted from output (matching canonical behavior).
 ///
 /// Diagnostic APIs ([fromJsonOrError], [actionFromJsonOrError]) return a
 /// sealed [AmeDecodeResult] / [AmeActionDecodeResult] so hosts can
@@ -109,7 +107,7 @@ class AmeSerializer {
   /// Diagnostic-bearing counterpart to [fromJson]. Returns
   /// [AmeDecodeSuccess] with the decoded [AmeNode] on success, or
   /// [AmeDecodeFailure] naming the failure mode and carrying the
-  /// original cause (when available). Resolves Bug 35.
+  /// original cause (when available).
   static AmeDecodeResult fromJsonOrError(String jsonString) {
     final dynamic raw;
     try {

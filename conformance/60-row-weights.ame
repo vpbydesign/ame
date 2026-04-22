@@ -1,0 +1,5 @@
+// conformance/60-row-weights.ame
+// Tests: row with per-child flex weights
+root = row([txt_long, badge_rating], weights=[1, 0])
+txt_long = txt("Long descriptive text that may wrap to two lines", body)
+badge_rating = badge("4.3", info)

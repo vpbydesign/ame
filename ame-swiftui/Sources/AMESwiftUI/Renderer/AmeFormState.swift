@@ -22,10 +22,9 @@ public final class AmeFormState: ObservableObject {
     private var toggleDefaults: [String: Bool] = [:]
 
     /// Diagnostic surface populated by `collectValues()` when an input id and
-    /// a toggle id collide (Bug #12). Soft-warn only: the merge order is
-    /// preserved (toggle wins) so that the input/toggle contract documented
-    /// in WP#4 Bug 5 stays stable; this list lets hosts detect the
-    /// data-loss class instead of silently shipping bad form payloads.
+    /// a toggle id collide. Soft-warn only: the merge order is preserved
+    /// (toggle wins); this list lets hosts detect the data-loss class
+    /// instead of silently shipping bad form payloads.
     ///
     /// Cleared and recomputed on every `collectValues()` call so the
     /// warnings always reflect the current registration set.
@@ -64,7 +63,7 @@ public final class AmeFormState: ObservableObject {
 
     /// Returns a binding for a Date input field.
     /// The date is stored as a formatted string in `values` using the specified format.
-    /// Format: "yyyy-MM-dd" for date, "HH:mm" for time — matching Kotlin renderer output.
+    /// Format: "yyyy-MM-dd" for date, "HH:mm" for time — matching canonical renderer output.
     public func dateBinding(for id: String, format: String) -> Binding<Date> {
         let formatter = DateFormatter()
         formatter.dateFormat = format
@@ -89,17 +88,12 @@ public final class AmeFormState: ObservableObject {
     ///
     /// Merge order: `inputDefaults` -> `values` (user input edits override) ->
     /// `toggleDefaults` -> `toggles` (user toggle edits override). This
-    /// preserves the pre-Bug-5 invariant that fields the user never touched
-    /// still appear in form submissions with their default value, and
-    /// preserves the documented contract that toggle wins on id collision.
+    /// preserves the invariant that fields the user never touched still
+    /// appear in form submissions with their default value, and preserves the
+    /// documented contract that toggle wins on id collision.
     ///
-    /// Bug #12 (WP#5) adds visibility without changing behavior: any id
-    /// that appears in BOTH the input layer (defaults+values) AND the
-    /// toggle layer (toggleDefaults+toggles) produces an entry in
-    /// `warnings`. Hosts can route warnings to a logger or developer
-    /// overlay to detect the silent-data-loss class. Warnings are
-    /// recomputed on every call (clear-then-recompute) so the snapshot
-    /// always matches the current registration set.
+    /// When an id is registered as both an input and a toggle, the toggle
+    /// value wins and a warning is recorded in `warnings` for host visibility.
     ///
     /// Input values are included as-is. Toggle boolean values are
     /// converted to "true" or "false" strings.
@@ -136,7 +130,7 @@ public final class AmeFormState: ObservableObject {
     /// as-is per actions.md.
     public func resolveInputReferences(_ args: [String: String]) -> [String: String] {
         let collected = collectValues()
-        // Bug #13: the original `\w+` excluded `-`, so `${input.user-name}`
+        // The original `\w+` excluded `-`, so `${input.user-name}`
         // was silently left unsubstituted. The character class below accepts
         // letters, digits, underscores, and hyphens. The hyphen is placed at
         // the end of the class to avoid being parsed as a range. The literal

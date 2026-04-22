@@ -1,0 +1,3 @@
+// conformance/62-list-item-minimal.ame
+// Tests: list_item with only title (all optional fields omitted)
+root = list_item("Settings")

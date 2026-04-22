@@ -27,7 +27,7 @@ public struct AmeTheme {
 
     /// Maps BadgeVariant enum values to background Color objects.
     ///
-    /// Bug #14 (WP#5, Path D): semantic system colors (`Color(.systemGreen)`
+    /// Semantic system colors (`Color(.systemGreen)`
     /// etc.) automatically adapt to the user's appearance setting per
     /// Apple HIG, with no `@Environment(\.colorScheme)` plumbing required.
     public static func badgeColor(_ variant: BadgeVariant) -> Color {
@@ -47,7 +47,6 @@ public struct AmeTheme {
     // MARK: - Badge Text Color Mapping
 
     /// Maps BadgeVariant to a foreground text color for contrast.
-    /// Bug #14 (WP#5, Path D): adaptive system colors.
     public static func badgeTextColor(_ variant: BadgeVariant) -> Color {
         switch variant {
         case .default: return .primary
@@ -72,7 +71,6 @@ public struct AmeTheme {
     }
 
     /// Maps CalloutType to a foreground tint color.
-    /// Bug #14 (WP#5, Path D): adaptive system colors.
     public static func calloutTint(_ type: CalloutType) -> Color {
         switch type {
         case .info:    return Color(.systemBlue)
@@ -91,7 +89,6 @@ public struct AmeTheme {
     // MARK: - Timeline Style Mapping
 
     /// Maps TimelineStatus to a circle fill color.
-    /// Bug #14 (WP#5, Path D): error state uses adaptive systemRed.
     public static func timelineCircleColor(_ status: TimelineStatus) -> Color {
         switch status {
         case .done:    return .accentColor
@@ -106,7 +103,6 @@ public struct AmeTheme {
     }
 
     /// Maps TimelineStatus to a connector line color.
-    /// Bug #14 (WP#5, Path D): error state uses adaptive systemRed.
     public static func timelineLineColor(_ status: TimelineStatus) -> Color {
         switch status {
         case .done:    return .accentColor
@@ -135,7 +131,7 @@ public struct AmeTheme {
 
     /// Maps SemanticColor to a platform-appropriate SwiftUI color.
     ///
-    /// Bug #14 (WP#5, Path D): adaptive system semantic colors. Apple's
+    /// Adaptive system semantic colors. Apple's
     /// `Color(.systemGreen)` etc. automatically resolve to mode-appropriate
     /// values per HIG, with no `@Environment(\.colorScheme)` plumbing
     /// required. SUCCESS stays recognizably green and WARNING stays

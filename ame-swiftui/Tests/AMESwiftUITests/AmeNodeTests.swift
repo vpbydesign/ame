@@ -474,7 +474,7 @@ final class AmeNodeTests: XCTestCase {
         XCTAssertEqual(children.count, 4)
 
         // weather_header = row
-        guard case .row(let headerChildren, let headerAlign, _) = children[0] else {
+        guard case .row(let headerChildren, let headerAlign, _, _, _) = children[0] else {
             XCTFail("Expected row for header")
             return
         }
@@ -512,7 +512,7 @@ final class AmeNodeTests: XCTestCase {
         XCTAssertEqual(condStyle, .body) // default, omitted from JSON
 
         // details row
-        guard case .row(let detailChildren, let detailAlign, _) = children[3] else {
+        guard case .row(let detailChildren, let detailAlign, _, _, _) = children[3] else {
             XCTFail("Expected row for details")
             return
         }
@@ -844,5 +844,107 @@ final class AmeNodeTests: XCTestCase {
             ])
         ])
         assertRoundTrip(tree)
+    }
+
+    // MARK: - v1.4 Row weights / crossAlign
+
+    func testRoundTripRowWithWeights() {
+        let node = AmeNode.row(
+            children: [.txt(text: "Wide"), .txt(text: "Narrow")],
+            weights: [1, 0]
+        )
+        assertRoundTrip(node)
+    }
+
+    func testRoundTripRowWithCrossAlign() {
+        let node = AmeNode.row(
+            children: [.txt(text: "A"), .txt(text: "B")],
+            crossAlign: .top
+        )
+        assertRoundTrip(node)
+    }
+
+    func testRoundTripRowWithWeightsAndCrossAlign() {
+        let node = AmeNode.row(
+            children: [.txt(text: "A"), .txt(text: "B")],
+            align: .spaceBetween,
+            gap: 12,
+            weights: [1, 1],
+            crossAlign: .bottom
+        )
+        assertRoundTrip(node)
+    }
+
+    func testRoundTripRowDefaultsOmitsNewFields() {
+        // v1.3 conformance preservation: a Row with only children must serialize
+        // byte-identically to v1.3 output (no weights, no cross_align in JSON).
+        let node = AmeNode.row(children: [.txt(text: "Item")])
+        assertRoundTrip(node)
+        guard let json = AmeSerializer.toJson(node) else {
+            XCTFail("toJson returned nil"); return
+        }
+        XCTAssertFalse(json.contains("weights"), "Default weights must not be encoded: \(json)")
+        XCTAssertFalse(json.contains("cross_align"), "Default cross_align must not be encoded: \(json)")
+    }
+
+    func testRowCrossAlignSerializesAsSnakeCase() {
+        let node = AmeNode.row(
+            children: [.txt(text: "A")],
+            crossAlign: .top
+        )
+        guard let json = AmeSerializer.toJson(node) else {
+            XCTFail("toJson returned nil"); return
+        }
+        XCTAssertTrue(json.contains("\"cross_align\""), "crossAlign must serialize as snake_case: \(json)")
+        XCTAssertFalse(json.contains("\"crossAlign\""), "camelCase must not appear in JSON: \(json)")
+    }
+
+    // MARK: - v1.4 list_item primitive
+
+    func testRoundTripListItemFull() {
+        let node = AmeNode.listItem(
+            title: "Pizza Place",
+            subtitle: "71 Mulberry St",
+            leading: .icon(name: "restaurant"),
+            trailing: .badge(label: "4.5", variant: .info),
+            action: .navigate(route: "/detail")
+        )
+        assertRoundTrip(node)
+    }
+
+    func testRoundTripListItemMinimal() {
+        let node = AmeNode.listItem(title: "Title only")
+        assertRoundTrip(node)
+        guard let json = AmeSerializer.toJson(node) else {
+            XCTFail("toJson returned nil"); return
+        }
+        XCTAssertFalse(json.contains("subtitle"), "Default subtitle must not be encoded: \(json)")
+        XCTAssertFalse(json.contains("leading"), "Default leading must not be encoded: \(json)")
+        XCTAssertFalse(json.contains("trailing"), "Default trailing must not be encoded: \(json)")
+        XCTAssertFalse(json.contains("action"), "Default action must not be encoded: \(json)")
+    }
+
+    func testRoundTripListItemNestedClickTargetCase() {
+        // The NORMATIVE nested click target case (§list_item): row-level action
+        // PLUS a trailing Btn with its own action. Both must survive round-trip.
+        let node = AmeNode.listItem(
+            title: "Pizza Place",
+            subtitle: "71 Mulberry St",
+            leading: .icon(name: "restaurant"),
+            trailing: .btn(label: "Directions", action: .navigate(route: "/dir")),
+            action: .navigate(route: "/detail")
+        )
+        assertRoundTrip(node)
+    }
+
+    func testRoundTripAlignTopBottom() {
+        // v1.4 added .top and .bottom to the Align enum. Verify both via Row.crossAlign.
+        for align in [Align.top, Align.bottom] {
+            let node = AmeNode.row(
+                children: [.txt(text: "X")],
+                crossAlign: align
+            )
+            assertRoundTrip(node)
+        }
     }
 }

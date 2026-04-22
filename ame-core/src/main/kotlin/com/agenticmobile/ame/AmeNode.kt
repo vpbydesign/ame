@@ -6,11 +6,11 @@ import kotlinx.serialization.Serializable
 /**
  * Sealed interface representing all AME UI node types.
  *
- * 21 visual primitives (matching primitives.md exactly),
+ * 22 visual primitives (matching primitives.md exactly),
  * 1 streaming forward reference (Ref),
  * 1 data iteration construct (Each).
  *
- * 24 subtypes total: 21 visual + Divider object + Ref + Each.
+ * 25 subtypes total: 22 visual + Divider object + Ref + Each.
  *
  * Children are List<AmeNode> (resolved tree form). The parser converts
  * identifier strings to Ref nodes during parsing, then resolves Ref -> real
@@ -42,13 +42,24 @@ sealed interface AmeNode {
      *
      * Parser disambiguation: when a numeric literal appears as the second positional
      * argument, it is interpreted as [gap], not [align].
+     *
+     * Named-only optional fields:
+     * - [weights]: per-child flex weights for proportional width distribution.
+     *   null = all children intrinsic. 0 = intrinsic. >0 = fill.
+     * - [crossAlign]: vertical alignment of children within the row.
+     *   null = center. Valid: TOP, CENTER, BOTTOM.
+     *
+     * Both default to null. The kotlinx serializer omits null fields, so
+     * conformance fixtures remain byte-identical.
      */
     @Serializable
     @SerialName("row")
     data class Row(
         val children: List<AmeNode> = emptyList(),
         val align: Align = Align.START,
-        val gap: Int = 8
+        val gap: Int = 8,
+        val weights: List<Int>? = null,
+        @SerialName("cross_align") val crossAlign: Align? = null
     ) : AmeNode
 
     // ── Content Primitives ─────────────────────────────────────────────
@@ -175,6 +186,29 @@ sealed interface AmeNode {
     data class Table(
         val headers: List<String>,
         val rows: List<List<String>>
+    ) : AmeNode
+
+    /**
+     * Structured single-row list entry with title, optional subtitle, optional
+     * leading and trailing nodes, and an optional whole-row tap action.
+     *
+     * Nested click target rule (NORMATIVE): when both [action] and [trailing]
+     * are present and [trailing] is itself an interactive node (Btn), the
+     * renderer MUST isolate the trailing tap so it does not also fire [action].
+     * See `specification/v1.0/primitives.md` §list_item for the full rule and
+     * platform-specific guidance.
+     *
+     * [action] is named-only in AME source: list_item("Title", action=nav("/x")).
+     * Positional slots are reserved for title, subtitle, leading, trailing.
+     */
+    @Serializable
+    @SerialName("list_item")
+    data class ListItem(
+        val title: String,
+        val subtitle: String? = null,
+        val leading: AmeNode? = null,
+        val trailing: AmeNode? = null,
+        val action: AmeAction? = null
     ) : AmeNode
 
     // ── Visualization Primitives ──────────────────────────────────────

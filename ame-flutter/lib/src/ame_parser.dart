@@ -19,18 +19,7 @@ class AmeParser {
   final List<String> _warnings = [];
   final List<String> _errors = [];
 
-  // Streaming-mode data section state (Bug 32, Flutter analog of v1.2 Bug 8).
-  //
-  // When `parseLine()` is the only ingest API in use, calling
-  // `parseLine("---")` flips `_streamingDataMode` on, and subsequent
-  // `parseLine()` calls accumulate non-letter-prefixed lines (JSON
-  // content) into `_streamingDataBuffer` until `getResolvedTree()`
-  // finalizes by parsing the buffer through `_parseDataSection`.
-  // `_streamingDataApplied` guards idempotence so repeated
-  // `getResolvedTree()` calls do not re-parse the buffer.
-  //
-  // The batch `parse()` entry path manages its own `dataLines`
-  // accumulator and never trips this state machine.
+  // Streaming data buffer: accumulated between parseLine("---") and getResolvedTree().
   bool _streamingDataMode = false;
   final StringBuffer _streamingDataBuffer = StringBuffer();
   bool _streamingDataApplied = false;
@@ -80,11 +69,6 @@ class AmeParser {
     if (trimmed.isEmpty) return null;
     if (trimmed.startsWith('//')) return null;
     if (trimmed == AmeKeywords.dataSeparator) {
-      // Bug 32 fix (Flutter analog of v1.2 Bug 8): flip streaming-mode
-      // data accumulator on. Subsequent parseLine() calls feed
-      // _streamingDataBuffer until the next reset(). Mirrors the batch
-      // parse() warning when the separator appears twice on the same
-      // parser lifetime.
       if (_streamingDataMode) {
         _warnings.add('Multiple --- separators found; ignoring subsequent ones');
       } else {
@@ -100,15 +84,13 @@ class AmeParser {
       // line is AME and anything else (`{`, `}`, `[`, `]`, `"`, digit,
       // sign, whitespace) accumulates into the JSON buffer. This lets
       // streaming consumers emit either order: AME-then-`---`-then-JSON
-      // (mirrors batch parse()) or `---`-then-JSON-then-AME (the audit
-      // test's contract).
+      // (mirrors batch parse()) or `---`-then-JSON-then-AME.
       final firstChar = trimmed.codeUnitAt(0);
       if (!_isLetter(firstChar)) {
         _streamingDataBuffer.write(line);
         _streamingDataBuffer.write('\n');
         return null;
       }
-      // Falls through to AME identifier handling below.
     }
 
     final equalsIndex = trimmed.indexOf('=');
@@ -151,12 +133,6 @@ class AmeParser {
   }
 
   AmeNode? getResolvedTree() {
-    // Bug 32 fix: finalize the streaming data buffer (if any) before
-    // resolving. Guarded by `_dataModel == null` so a prior batch
-    // parse() that already populated _dataModel takes precedence
-    // (mixed-mode safety, per the streaming.md contract). Guarded by
-    // `!_streamingDataApplied` so repeated getResolvedTree() calls are
-    // idempotent.
     if (_streamingDataBuffer.isNotEmpty &&
         _dataModel == null &&
         !_streamingDataApplied) {
@@ -327,6 +303,7 @@ class AmeParser {
       'input' => _buildInput(positional, named),
       'toggle' => _buildToggle(positional, named),
       'list' => _buildList(positional, named),
+      'list_item' => _buildListItem(positional, named),
       'table' => _buildTable(positional, named),
       'each' => _buildEach(positional, named),
       'chart' => _buildChart(positional, named),
@@ -379,7 +356,48 @@ class AmeParser {
       if (parsed != null) align = parsed;
     }
 
-    return AmeRow(children: children, align: align, gap: gap);
+    var weights = named['weights'] != null
+        ? _resolveIntListArg(named['weights']!)
+        : null;
+    if (weights != null && weights.length != children.length) {
+      _warnings.add(
+        'row weights length (${weights.length}) does not match children (${children.length}); falling back to intrinsic sizing',
+      );
+      weights = null;
+    }
+    final crossAlignArg = named['crossAlign'] ?? named['cross_align'];
+    final crossAlign =
+        crossAlignArg != null ? _resolveAlignArg(crossAlignArg) : null;
+
+    return AmeRow(
+      children: children,
+      align: align,
+      gap: gap,
+      weights: weights,
+      crossAlign: crossAlign,
+    );
+  }
+
+  AmeListItem _buildListItem(
+      List<_ParsedValue> pos, Map<String, _ParsedValue> named) {
+    final title = _resolveStringArg(pos.elementAtOrNull(0));
+    final subtitleArg = pos.elementAtOrNull(1);
+    final subtitle = switch (subtitleArg) {
+      _PvStr(value: final v) => v,
+      _PvDataRef(path: final p) => '\$$p',
+      _ => null,
+    };
+    final leading = _resolveNodeArg(pos.elementAtOrNull(2));
+    final trailing = _resolveNodeArg(pos.elementAtOrNull(3));
+    final action =
+        named['action'] != null ? _resolveActionArg(named['action']!) : null;
+    return AmeListItem(
+      title: title,
+      subtitle: subtitle,
+      leading: leading,
+      trailing: trailing,
+      action: action,
+    );
   }
 
   AmeTxt _buildTxt(List<_ParsedValue> pos, Map<String, _ParsedValue> named) {
@@ -578,11 +596,9 @@ class AmeParser {
     if (seriesArg is _PvDataRef) {
       seriesPath = seriesArg.path;
     } else if (seriesArg is _PvArr) {
-      // Bug 31 fix (Flutter analog of v1.2 Bug 7): if every item in the
-      // array parses as a DataRef ($path), treat as array-of-paths and
-      // store in `seriesPaths` for all-or-nothing resolution. Otherwise
-      // fall through to the existing literal nested-numeric-array
-      // handling. Mirrors Kotlin `AmeParser.kt::buildChart` v1.2.
+      // Disambiguate: if every element parses to a $path reference,
+      // treat as array-of-paths; otherwise fall back to the existing
+      // literal nested-numeric-array handling.
       final parsedItems =
           seriesArg.items.map((item) => _parseArgValue(item.trim())).toList();
       final allDataRefs =
@@ -652,9 +668,6 @@ class AmeParser {
     final title = pos.elementAtOrNull(2) != null
         ? _resolveStringArgNullable(pos.elementAtOrNull(2)!)
         : null;
-    // Bug 30 fix: read optional `color=` named arg and store on the AST so
-    // the spec-promised `callout(... color=)` round-trips through parse +
-    // serialize. Mirrors Kotlin `AmeParser.kt::buildCallout` v1.2.
     final color = named['color'] != null
         ? _resolveSemanticColorArg(named['color']!)
         : null;
@@ -935,6 +948,36 @@ class AmeParser {
     return null;
   }
 
+  List<int>? _resolveIntListArg(_ParsedValue? arg) {
+    if (arg == null) return null;
+    if (arg is! _PvArr) return null;
+    final out = <int>[];
+    for (final item in arg.items) {
+      final parsed = _parseArgValue(item.trim());
+      if (parsed is _PvNum) {
+        final n = parsed.asInt;
+        if (n < 0) {
+          _warnings.add('Negative weight $n treated as 0');
+          out.add(0);
+        } else {
+          out.add(n);
+        }
+      }
+    }
+    return out;
+  }
+
+  AmeNode? _resolveNodeArg(_ParsedValue? arg) {
+    if (arg == null) return null;
+    return switch (arg) {
+      _PvNodeValue(node: final n) => n,
+      _PvIdent(name: final name) => AmeRef(id: name),
+      _PvStr(value: final v) => AmeTxt(text: v),
+      _PvDataRef(path: final p) => AmeTxt(text: '\$$p'),
+      _ => null,
+    };
+  }
+
   List<List<String>> _resolveNestedStringListArg(_ParsedValue? arg) {
     if (arg == null) return const [];
     if (arg is _PvArr) {
@@ -1048,10 +1091,7 @@ class AmeParser {
 
   /// Finds the matching `]` for an array literal while respecting string
   /// literals and escapes, so a `]` inside a `"..."` value does not
-  /// prematurely close the array (Bug 26b, Flutter analog of v1.2 Bug 3).
-  ///
-  /// Mirrors the Kotlin canonical implementation in
-  /// `ame-core/.../AmeParser.kt::parseArray` (v1.2 fix).
+  /// prematurely close the array.
   List<String> _parseArray(String input) {
     final trimmed = input.trim();
     if (!trimmed.startsWith('[')) return const [];
@@ -1230,12 +1270,7 @@ class AmeParser {
 
   /// Finds the matching `)` for a parenthesized region while respecting
   /// string literals and escapes, so a `)` inside a `"..."` value does
-  /// not prematurely close the region (Bug 26a, Flutter analog of v1.2
-  /// Bug 3). The `escaped` state correctly keeps `inString` across `\"`
-  /// so an escaped quote followed by `)` stays inside the string.
-  ///
-  /// Mirrors the Kotlin canonical implementation in
-  /// `ame-core/.../AmeParser.kt::extractParenContent` (v1.2 fix).
+  /// not prematurely close the region.
   String _extractParenContent(String input, int openIndex) {
     var depth = 0;
     var closeIndex = -1;
@@ -1306,14 +1341,9 @@ class AmeParser {
   /// against `scope`. The [visited] set carries the chain of ref ids that
   /// are currently being dereferenced down a single branch of the tree;
   /// when a Ref's id appears in [visited] we treat it as a cycle and leave
-  /// the node unresolved (Bug 27, Flutter analog of v1.2 Bug 11). The set
-  /// is rebuilt per call (`{...visited, id}`) so sibling branches and
-  /// diamond-ref patterns (`a -> c, b -> c`) resolve independently rather
-  /// than poisoning each other.
-  ///
-  /// Mirrors the Kotlin canonical implementation in
-  /// `ame-core/.../AmeParser.kt::resolveTree` (v1.2 fix), including the
-  /// per-WP#3 immutable visited propagation for diamond correctness.
+  /// the node unresolved. The set is rebuilt per call (`{...visited, id}`)
+  /// so sibling branches and diamond-ref patterns (`a -> c, b -> c`)
+  /// resolve independently rather than poisoning each other.
   AmeNode _resolveTree(
     AmeNode node, [
     Map<String, dynamic>? scope,
@@ -1323,11 +1353,20 @@ class AmeParser {
     return switch (node) {
       AmeCol(children: final ch, align: final a) =>
         AmeCol(children: _resolveChildren(ch, scope, visited), align: a),
-      AmeRow(children: final ch, align: final a, gap: final g) =>
+      AmeRow(
+        children: final ch,
+        align: final a,
+        gap: final g,
+        weights: final w,
+        crossAlign: final ca,
+      ) =>
         AmeRow(
-            children: _resolveChildren(ch, scope, visited),
-            align: a,
-            gap: g),
+          children: _resolveChildren(ch, scope, visited),
+          align: a,
+          gap: g,
+          weights: w,
+          crossAlign: ca,
+        ),
       AmeCard(children: final ch, elevation: final e) =>
         AmeCard(
             children: _resolveChildren(ch, scope, visited), elevation: e),
@@ -1425,6 +1464,22 @@ class AmeParser {
                 status: st,
               )
             : node,
+      AmeListItem(
+        title: final t,
+        subtitle: final s,
+        leading: final l,
+        trailing: final tr,
+        action: final a,
+      ) =>
+        AmeListItem(
+          title: scope != null ? _resolvePathInScope(t, scope) : t,
+          subtitle: s != null && scope != null
+              ? _resolvePathInScope(s, scope)
+              : s,
+          leading: l != null ? _resolveTree(l, scope, visited) : null,
+          trailing: tr != null ? _resolveTree(tr, scope, visited) : null,
+          action: a,
+        ),
       AmeChart() => scope != null
           ? node.copyWith(
               values: () =>
@@ -1438,12 +1493,9 @@ class AmeParser {
                       ? _resolveStringArrayInScope(node.labelsPath!, scope!)
                       : null),
               series: () {
-                // Resolution priority: literal series wins (preserved
-                // from buildChart), then single-path matrix, then
-                // array-of-paths (Bug 31, all-or-nothing per Kotlin
-                // canonical). The all-or-nothing guard preserves the
-                // empty-state contract — a partial resolution produces
-                // misleading multi-series rendering.
+                // Resolution priority: literal series wins, then single-path
+                // matrix, then array-of-paths. All-or-nothing: a partial
+                // resolution produces misleading multi-series rendering.
                 if (node.series != null) return node.series;
                 if (node.seriesPath != null) {
                   return _resolveNestedDoubleArrayInScope(
@@ -1472,7 +1524,7 @@ class AmeParser {
   }
 
   /// Resolves an inline children list, handling AmeRef cycle detection
-  /// at the same depth as `_resolveTree` (Bug 27). The [visited] set is
+  /// at the same depth as `_resolveTree`. The [visited] set is
   /// passed through verbatim because each child starts a new branch.
   List<AmeNode> _resolveChildren(
     List<AmeNode> children,
@@ -1498,7 +1550,7 @@ class AmeParser {
 
   /// Expands an AmeEach by resolving its template against each element of
   /// the bound array. The [visited] set is passed through to detect ref
-  /// cycles inside the template body (Bug 27).
+  /// cycles inside the template body.
   List<AmeNode> _expandEach(
     AmeEach node,
     Map<String, dynamic>? parentScope, [

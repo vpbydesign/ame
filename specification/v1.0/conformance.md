@@ -173,14 +173,14 @@ Implementations advertising AME conformance SHOULD include a status line
 in their README:
 
 ```text
-AME Conformance: Strict (v1.2). 57/57 conformance tests pass,
+AME Conformance: Strict (v1.4). 62/62 conformance tests pass,
                                  audit regression suite passes.
 ```
 
 Or for partial conformance:
 
 ```text
-AME Conformance: Core (v1.2). 57/57 conformance tests pass.
+AME Conformance: Core (v1.4). 62/62 conformance tests pass.
                                Streaming and Strict not yet supported.
 ```
 

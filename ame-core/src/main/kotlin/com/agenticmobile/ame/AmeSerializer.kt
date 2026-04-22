@@ -44,7 +44,7 @@ object AmeSerializer {
      * IO exception so hosts can distinguish invalid JSON, schema mismatch,
      * and unexpected runtime failures without losing the original cause.
      *
-     * Resolves Bug #15 by lifting the diagnostic out of the previous
+     * Lifts the diagnostic out of the previous
      * "swallow into null" path while keeping the legacy nullable APIs for
      * backward compatibility.
      */
@@ -66,7 +66,7 @@ object AmeSerializer {
      * [Result.failure] wrapping a [SerializationException] that names
      * the failure mode and carries the original cause.
      *
-     * Resolves Bug #15: the previous nullable [fromJson] swallowed every
+     * The previous nullable [fromJson] swallowed every
      * failure into a single `null` return, so hosts could not distinguish
      * invalid JSON, schema mismatch, missing root, or runtime errors. This
      * API is additive; the legacy [fromJson] stays unchanged.

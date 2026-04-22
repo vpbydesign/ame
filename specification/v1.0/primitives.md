@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This document defines the 21 standard AME primitives: the built-in UI elements
+This document defines the 22 standard AME primitives: the built-in UI elements
 that every conforming AME renderer MUST support. Each primitive is a composable
 building block that maps to a native platform widget.
 
@@ -14,7 +14,7 @@ Primitives are organized into ten categories:
 | Content | `txt`, `img`, `icon`, `divider`, `spacer` | Display text, images, icons, and whitespace |
 | Semantic | `card`, `badge`, `progress` | Meaningful containers, labels, and indicators |
 | Interactive | `btn`, `input`, `toggle` | User actions and form data entry |
-| Data | `list`, `table` | Structured data display |
+| Data | `list`, `list_item`, `table` | Structured data display |
 | Visualization | `chart` | Data charts (line, bar, pie, sparkline) |
 | Rich Content | `code` | Syntax-highlighted code display |
 | Disclosure | `accordion`, `carousel` | Collapsible and scrollable containers |
@@ -108,7 +108,7 @@ Arranges children in a horizontal line, left to right.
 
 **Signature:**
 ```
-identifier = row([children], align?, gap?)
+identifier = row([children], align?, gap?, weights?, crossAlign?)
 ```
 
 **Arguments:**
@@ -116,10 +116,13 @@ identifier = row([children], align?, gap?)
 | Pos | Name | Type | Required | Default | Description |
 |-----|------|------|----------|---------|-------------|
 | 0 | children | Array of identifiers | Yes | — | Child elements to arrange horizontally |
-| 1 | align | Align enum | No | `start` | Horizontal distribution of children |
+| 1 | align | Align enum | No | `start` | Main-axis (horizontal) distribution of children |
 | 2 | gap | Integer (dp) | No | `8` | Spacing between children in dp |
+| — | weights | Array of integers (named only) | No | `null` | Per-child flex weights for proportional width distribution |
+| — | crossAlign | Align enum (named only) | No | `center` | Cross-axis (vertical) alignment of children within the row |
 
-**Align enum values:** `start`, `center`, `end`, `space_between`, `space_around`
+**Align enum values for `align`:** `start`, `center`, `end`, `space_between`, `space_around`
+**Align enum values for `crossAlign`:** `top`, `center`, `bottom`
 
 When a numeric literal appears as the second argument (position 1), the parser
 MUST interpret it as `gap`, not `align`. This is because `align` values are
@@ -134,7 +137,32 @@ header = row([title, menu], space_between)
 
 // align=space_between, gap=16
 toolbar = row([back, title, action], space_between, 16)
+
+// First child fills remaining space, second wraps to intrinsic width
+title_row = row([title_text, info_badge], weights=[1, 0])
+
+// Equal halves
+split = row([left_card, right_card], weights=[1, 1])
+
+// Leading icon top-aligned with first line of multi-line text column
+list_row = row([leading_icon, text_col], crossAlign=top)
 ```
+
+**Layout Behavior for `weights`:**
+
+- `null` (default): all children use intrinsic sizing. Backward-compatible behavior identical to v1.3.
+- Each entry corresponds to the child at the same index. `0` = intrinsic width; `>0` = proportional fill of remaining space.
+- When `weights.length != children.length`, the parser SHOULD log a warning and fall back to intrinsic sizing for all children.
+- Negative weights are invalid; the parser SHOULD treat them as `0` and log a warning.
+
+**Layout Behavior for `crossAlign`:**
+
+- `null` (default) or `center`: children are centered on the cross axis. Backward-compatible behavior identical to v1.3.
+- `top`: children align to the top of the row. Useful when a leading icon must align with the first line of an adjacent multi-line text column.
+- `bottom`: children align to the bottom of the row.
+- Using `crossAlign=start` or `crossAlign=end` is accepted but discouraged; the renderer SHOULD treat them as `top` and `bottom` respectively and log a warning.
+
+**JSON wire format:** `weights` serializes as `weights`. `crossAlign` serializes as `cross_align` (snake_case, matching `space_between`, `timeline_item`). The parser accepts both `crossAlign=` and `cross_align=` in AME source for LLM leniency.
 
 **Compose Mapping:**
 ```kotlin
@@ -146,17 +174,27 @@ Row(
         Align.SPACE_BETWEEN -> Arrangement.SpaceBetween
         Align.SPACE_AROUND -> Arrangement.SpaceAround
     },
-    verticalAlignment = Alignment.CenterVertically
+    verticalAlignment = when (crossAlign) {
+        Align.TOP -> Alignment.Top
+        Align.BOTTOM -> Alignment.Bottom
+        else -> Alignment.CenterVertically
+    }
 ) {
-    children.forEach { child -> AmeRenderer(child) }
+    children.forEachIndexed { index, child ->
+        val w = weights?.getOrNull(index) ?: 0
+        val mod = if (w > 0) Modifier.weight(w.toFloat()) else Modifier
+        Box(modifier = mod) { AmeRenderer(child) }
+    }
 }
 ```
 
 **SwiftUI Mapping:**
 ```swift
-HStack(spacing: CGFloat(gap)) {
-    ForEach(children) { child in
+HStack(alignment: crossAlign.swiftAlignment, spacing: CGFloat(gap)) {
+    ForEach(Array(children.enumerated()), id: \.offset) { index, child in
+        let w = weights?[safe: index] ?? 0
         AmeRenderer(node: child, formState: formState, onAction: onAction)
+            .frame(maxWidth: w > 0 ? .infinity : nil)
     }
 }
 // space_between: children separated by Spacer()
@@ -172,6 +210,10 @@ HStack(spacing: CGFloat(gap)) {
 - When a numeric literal appears at position 1, it is interpreted as `gap`,
   not `align`.
 - Unknown `align` value defaults to `start` and logs a warning.
+- `weights` length mismatch falls back to intrinsic sizing (warning).
+- `crossAlign` with a main-axis value (`space_between`, `space_around`) defaults to `center` (warning).
+
+**Backward compatibility:** Omitting both `weights` and `crossAlign` produces behavior identical to v1.3 `row`. The JSON serializer omits null fields, so existing v1.3 conformance fixtures remain byte-identical.
 
 ---
 
@@ -1060,6 +1102,119 @@ its column header (e.g., "Storage: 500 GB").
 
 ---
 
+### `list_item` — Structured List Row
+
+A single-row list entry composed of a primary title, optional subtitle, optional leading and trailing content, and an optional whole-row tap action. `list_item` solves a common composition problem in v1.3: a `row` containing an icon, a text column, and a trailing badge or button squeezes the text column to zero width when the trailing content is wide on small screens (the original VirtualOn 229dp regression). `list_item` guarantees vertical alignment, proportional width distribution, and a minimum trailing width, and it handles nested click target isolation natively.
+
+**Signature:**
+```
+identifier = list_item("title", "subtitle"?, leading?, trailing?, action=...)
+```
+
+**Arguments:**
+
+| Pos | Name | Type | Required | Default | Description |
+|-----|------|------|----------|---------|-------------|
+| 0 | title | String | Yes | — | Primary text. Single line by default; wraps to a second line if needed. |
+| 1 | subtitle | String | No | none | Secondary text shown below the title in caption style. |
+| 2 | leading | AmeNode | No | none | Leading content (typically `icon`, `img`, `badge`, or any node). Top-aligned with the title. |
+| 3 | trailing | AmeNode | No | none | Trailing content (typically `badge`, `btn`, `txt`, or any node). Vertically centered, with a guaranteed minimum width so it is never squeezed to zero. |
+| — | action | AmeAction (named only) | No | none | Makes the entire row tappable. Dispatched via `onAction` like `btn`. Named-only to disambiguate from `trailing`. |
+
+**Example:**
+```
+// Basic listing with leading icon and trailing badge
+pizza_row = list_item("Pizza Place", "71 Mulberry St", icon("restaurant"), badge("★ 4.5", info))
+
+// Whole-row tap navigates to detail screen, trailing button has its own action
+tappable_row = list_item("Pizza Place", "71 Mulberry St", icon("restaurant"), btn("Directions", nav("/directions")), action=nav("/detail"))
+
+// Title only
+header_row = list_item("Settings")
+```
+
+**Compose Mapping:**
+```kotlin
+ListItem(
+    headlineContent = { Text(node.title) },
+    supportingContent = node.subtitle?.let { { Text(it) } },
+    leadingContent = node.leading?.let {
+        { AmeRenderer(it, formState, onAction) }
+    },
+    trailingContent = node.trailing?.let {
+        { AmeRenderer(it, formState, onAction) }
+    },
+    modifier = if (node.action != null) {
+        Modifier.clickable { onAction(node.action) }
+    } else Modifier
+)
+```
+
+**SwiftUI Mapping:**
+```swift
+HStack(alignment: .top, spacing: 12) {
+    if let leading = node.leading {
+        AmeRenderer(node: leading, formState: formState, onAction: onAction)
+    }
+    VStack(alignment: .leading, spacing: 2) {
+        Text(node.title)
+        if let subtitle = node.subtitle {
+            Text(subtitle).font(.caption).foregroundColor(.secondary)
+        }
+    }
+    Spacer()
+    if let trailing = node.trailing {
+        AmeRenderer(node: trailing, formState: formState, onAction: onAction)
+            .highPriorityGesture(TapGesture().onEnded { /* trailing-only */ })
+    }
+}
+.contentShape(Rectangle())
+.onTapGesture {
+    if let action = node.action { onAction(action) }
+}
+```
+
+**Flutter Mapping:**
+```dart
+ListTile(
+  title: Text(node.title),
+  subtitle: node.subtitle != null ? Text(node.subtitle!) : null,
+  leading: node.leading != null ? AmeRenderer(node: node.leading!, ...) : null,
+  trailing: node.trailing != null ? AmeRenderer(node: node.trailing!, ...) : null,
+  onTap: node.action != null ? () => onAction(node.action!) : null,
+);
+```
+
+**Nested Click Target Rule (NORMATIVE):**
+
+When a `list_item` has both `action` (whole-row tap) and a `trailing` that is itself an interactive node (such as `btn`), the renderer MUST ensure both targets are independently tappable:
+
+1. Tapping the trailing interactive node MUST fire ONLY that node's action; the row's `action` MUST NOT also fire.
+2. Tapping anywhere else on the row (title, subtitle, leading, empty space) MUST fire the row's `action`.
+3. Screen readers MUST announce both the row action and the trailing action as separate interactive elements within the row's semantics group.
+
+Renderer-specific guidance (informative):
+
+- **Compose:** Material 3's `ListItem` slot API handles this natively. The `trailingContent` slot is rendered outside the row's `clickable` modifier, so trailing taps do not propagate to the row.
+- **SwiftUI:** Apply `.contentShape(Rectangle())` and `.onTapGesture` to the row container, and `.highPriorityGesture` (or a dedicated `Button`) to the trailing interactive node so its tap consumes the gesture before the row gesture fires.
+- **Flutter:** `ListTile` handles trailing-tap isolation natively when the `trailing` widget owns its own gesture detector (such as `IconButton` or a wrapped `InkWell`).
+
+**Accessibility:**
+
+`list_item` SHOULD be announced as a single semantics group, similar to `card`. The title and subtitle SHOULD be merged into the group's `contentDescription` so a screen reader announces them as one phrase. If `action` is present, the group SHOULD be announced as tappable. The `trailing` interactive node, if present, MUST remain independently focusable within the group.
+
+**JSON wire format:** `_type` is `"list_item"`. Optional fields (`subtitle`, `leading`, `trailing`, `action`) are omitted when null.
+
+**Error Handling:**
+
+- Missing `title` is treated as an empty string (the row still renders structurally, but a warning is logged).
+- A non-node value passed to `leading` or `trailing` is rendered as text via the renderer's text fallback.
+- Passing an `action=` whose value is not a valid action is silently dropped (the row becomes non-tappable).
+
+**Data binding:** `title` and `subtitle` resolve `$path` references against the current scope (top-level data or the active `each` item). `leading` and `trailing` are recursively resolved as child nodes. `action` is passed through unchanged.
+
+---
+
 ## Visualization Primitives
 
 ### `chart` — Data Visualization
@@ -1859,7 +2014,7 @@ significantly better visual clarity.
 | # | Primitive | Category | Required Args | Optional Args | Has Actions |
 |---|-----------|----------|---------------|---------------|-------------|
 | 1 | `col` | Layout | `[children]` | `align` | No |
-| 2 | `row` | Layout | `[children]` | `align`, `gap` | No |
+| 2 | `row` | Layout | `[children]` | `align`, `gap`, `weights`, `crossAlign` | No |
 | 3 | `txt` | Content | `"text"` | `style`, `max_lines`, `color` | No |
 | 4 | `img` | Content | `"url"` | `height` | No |
 | 5 | `icon` | Content | `"name"` | `size` | No |
@@ -1872,13 +2027,14 @@ significantly better visual clarity.
 | 12 | `input` | Interactive | `id`, `"label"` | `type`, `options` | No (data) |
 | 13 | `toggle` | Interactive | `id`, `"label"` | `default` | No (data) |
 | 14 | `list` | Data | `[children]` | `dividers` | No |
-| 15 | `table` | Data | `headers`, `rows` | — | No |
-| 16 | `chart` | Visualization | `type`, `values` | `labels`, `series`, `height`, `color` | No |
-| 17 | `code` | Rich Content | `"language"`, `"content"` | `"title"` | No (copy is intrinsic) |
-| 18 | `accordion` | Disclosure | `"title"`, `[children]` | `expanded` | No |
-| 19 | `carousel` | Disclosure | `[children]` | `peek` | No |
-| 20 | `callout` | Alert | `type`, `"content"` | `"title"` | No |
-| 21 | `timeline` | Sequence | `[children]` | — | No |
+| 15 | `list_item` | Data | `"title"` | `"subtitle"`, `leading`, `trailing`, `action` | Yes |
+| 16 | `table` | Data | `headers`, `rows` | — | No |
+| 17 | `chart` | Visualization | `type`, `values` | `labels`, `series`, `height`, `color` | No |
+| 18 | `code` | Rich Content | `"language"`, `"content"` | `"title"` | No (copy is intrinsic) |
+| 19 | `accordion` | Disclosure | `"title"`, `[children]` | `expanded` | No |
+| 20 | `carousel` | Disclosure | `[children]` | `peek` | No |
+| 21 | `callout` | Alert | `type`, `"content"` | `"title"` | No |
+| 22 | `timeline` | Sequence | `[children]` | — | No |
 | — | `timeline_item` | (Sequence child) | `"title"` | `"subtitle"`, `status` | No |
 
 ---
@@ -1939,6 +2095,10 @@ significantly better visual clarity.
 | `end` | Right-aligned / bottom-aligned |
 | `space_between` | Even spacing, no edge padding (row only) |
 | `space_around` | Even spacing with edge padding (row only) |
+| `top` | Cross-axis top alignment (valid for `crossAlign` on `row` only) |
+| `bottom` | Cross-axis bottom alignment (valid for `crossAlign` on `row` only) |
+
+`top` and `bottom` are reserved for cross-axis use via the named `crossAlign=` argument on `row`. Using them in a main-axis `align=` position is a parser warning (the renderer falls back to `start`).
 
 ### ChartType
 
@@ -1995,3 +2155,4 @@ never to hardcoded hex values.
 |---------|------|---------|
 | 1.0 | 2026-04-05 | Initial specification — 15 primitives, 5 enum types |
 | 1.1 | 2026-04-08 | Added 6 new primitives (chart, code, accordion, carousel, callout, timeline/timeline_item), SemanticColor enum, 3 new enum types (ChartType, CalloutType, TimelineStatus), color= argument on txt/badge. Total: 21 primitives, 10 categories. |
+| 1.4 | 2026-04-21 | Added `list_item` primitive for structured list rows with nested click target isolation. Extended `row` with `weights` (per-child flex distribution) and `crossAlign` (vertical alignment) named arguments. Added `top` and `bottom` to the Align enum for cross-axis use. Total: 22 primitives, 7 Align values. |

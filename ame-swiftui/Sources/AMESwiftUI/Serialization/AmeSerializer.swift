@@ -3,14 +3,14 @@ import Foundation
 /// Serializes and deserializes AmeNode trees and AmeAction objects to/from JSON.
 ///
 /// Uses Swift's Codable with custom encode/decode implementations that match
-/// the Kotlin kotlinx.serialization output format:
+/// the canonical AME JSON format:
 /// - Class discriminator key: `"_type"`
 /// - Default values omitted (matching `encodeDefaults = false`)
 /// - Forward-compatible deserialization (unknown keys ignored via Codable defaults)
 /// - Whole-number Double / Float values preserve the `.0` suffix
-///   (canonical form per `regression-protocol.md` §7; see Bug 21). Foundation's
-///   `JSONEncoder` strips trailing zeros (`Double(1.0)` -> `1`), but
-///   `kotlinx.serialization` writes `1.0`, breaking cross-runtime byte-equality.
+///   (canonical form per `regression-protocol.md` §7). Foundation's
+///   `JSONEncoder` strips trailing zeros (`Double(1.0)` -> `1`), breaking
+///   cross-runtime byte-equality.
 ///   AME wraps the affected fields (`Chart.values`, `Chart.series`,
 ///   `Progress.value`) in `PreservedDouble` / `PreservedFloat`, which encodes
 ///   the value as a sentinel-bracketed string and `toJson(_:)` strips the
@@ -54,7 +54,7 @@ public struct AmeSerializer {
     /// underlying decoding `Error` so hosts can distinguish invalid JSON,
     /// schema mismatch, and unexpected runtime failures.
     ///
-    /// Resolves Bug #15: the previous nullable ``fromJson(_:)`` swallowed
+    /// The previous nullable ``fromJson(_:)`` swallowed
     /// every failure into a single `nil` return. This API is additive; the
     /// legacy nullable function stays unchanged for backward compatibility.
     public static func fromJsonOrError(_ jsonString: String) -> Result<AmeNode, Error> {
@@ -119,10 +119,10 @@ public struct AmeSerializer {
     }
 }
 
-// MARK: - Preserved-Double / Preserved-Float wrappers (Bug 21)
+// MARK: - Preserved-Double / Preserved-Float wrappers
 
 /// Encoder-side wrapper that forces a Double to round-trip through JSON with
-/// the canonical Kotlin representation (e.g., `1.0` instead of `1`). Wraps
+/// the canonical representation (e.g., `1.0` instead of `1`). Wraps
 /// the value into a sentinel-bracketed string at encode time;
 /// `AmeSerializer.toJson(_:)` strips the sentinels post-encode, leaving a
 /// raw JSON number. Decode is intentionally unimplemented: the JSON wire
@@ -140,9 +140,9 @@ struct PreservedDouble: Encodable {
         try container.encode(PreservedNumberSentinel.wrap(Self.canonicalString(value)))
     }
 
-    /// Match Kotlin `kotlinx.serialization` Double formatting: whole numbers
-    /// always carry the `.0` suffix; fractional values use Swift's shortest
-    /// round-trip representation (which already matches Kotlin for the
+    /// Canonical Double formatting: whole numbers always carry the `.0`
+    /// suffix; fractional values use Swift's shortest round-trip
+    /// representation (which already matches the canonical form for the
     /// patterns AME data normally contains, e.g., `10.5`, `3.14`, `0.75`).
     static func canonicalString(_ value: Double) -> String {
         // Pre-condition: Doubles in AME must be finite (NaN / Inf are not
@@ -160,7 +160,7 @@ struct PreservedDouble: Encodable {
 }
 
 /// Float counterpart of `PreservedDouble`, used for `Progress.value` which
-/// is `Float` in the Swift AST (matching Kotlin's `Float`).
+/// is `Float` in the Swift AST.
 struct PreservedFloat: Encodable {
     let value: Float
 

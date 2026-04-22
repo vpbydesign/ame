@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -40,6 +41,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -76,6 +79,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -97,8 +102,8 @@ import java.util.TimeZone
  * Recursive Composable that renders any [AmeNode] tree as native Material 3 UI.
  *
  * This is the main entry point for the AME Compose renderer. It dispatches
- * to type-specific private composables via an exhaustive `when` over all 24
- * [AmeNode] sealed subtypes (21 visual + Ref, Each, TimelineItem).
+ * to type-specific private composables via an exhaustive `when` over all 25
+ * [AmeNode] sealed subtypes (22 visual + Ref, Each, TimelineItem).
  * The Kotlin compiler enforces exhaustiveness — adding a new subtype to
  * [AmeNode] will cause a compile error here until a rendering branch is added.
  *
@@ -147,6 +152,7 @@ fun AmeRenderer(
         is AmeNode.Input -> AmeInput(node, formState, modifier)
         is AmeNode.Toggle -> AmeToggle(node, formState, modifier)
         is AmeNode.DataList -> AmeDataList(node, formState, onAction, modifier, depth)
+        is AmeNode.ListItem -> AmeListItem(node, formState, onAction, modifier, depth)
         is AmeNode.Table -> AmeTable(node, modifier)
         is AmeNode.Chart -> AmeChart(node, modifier)
         is AmeNode.Code -> AmeCode(node, modifier)
@@ -182,6 +188,7 @@ private fun AmeCol(
             Align.CENTER -> Alignment.CenterHorizontally
             Align.END -> Alignment.End
             Align.SPACE_BETWEEN, Align.SPACE_AROUND -> Alignment.Start
+            Align.TOP, Align.BOTTOM -> Alignment.Start
         },
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier,
@@ -204,6 +211,12 @@ private fun AmeRow(
     modifier: Modifier,
     depth: Int,
 ) {
+    val verticalAlignment = when (node.crossAlign) {
+        Align.TOP -> Alignment.Top
+        Align.BOTTOM -> Alignment.Bottom
+        else -> Alignment.CenterVertically
+    }
+
     Row(
         horizontalArrangement = when (node.align) {
             Align.START -> Arrangement.spacedBy(node.gap.dp)
@@ -211,12 +224,21 @@ private fun AmeRow(
             Align.END -> Arrangement.spacedBy(node.gap.dp, Alignment.End)
             Align.SPACE_BETWEEN -> Arrangement.SpaceBetween
             Align.SPACE_AROUND -> Arrangement.SpaceAround
+            Align.TOP, Align.BOTTOM -> Arrangement.spacedBy(node.gap.dp)
         },
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = verticalAlignment,
         modifier = modifier,
     ) {
-        node.children.forEach { child ->
-            AmeRenderer(child, formState, onAction, depth = depth + 1)
+        val weights = node.weights
+        node.children.forEachIndexed { index, child ->
+            val w = if (weights != null && index < weights.size) weights[index] else 0
+            if (w > 0) {
+                Box(modifier = Modifier.weight(w.toFloat())) {
+                    AmeRenderer(child, formState, onAction, depth = depth + 1)
+                }
+            } else {
+                AmeRenderer(child, formState, onAction, depth = depth + 1)
+            }
         }
     }
 }
@@ -280,7 +302,9 @@ private fun AmeCard(
 ) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = node.elevation.dp),
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {},
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -298,10 +322,15 @@ private fun AmeCard(
 private fun AmeBadge(node: AmeNode.Badge, modifier: Modifier) {
     val bgColor = node.color?.let { AmeTheme.semanticColor(it) }
         ?: AmeTheme.badgeColor(node.variant)
+    val variantName = node.variant.name.lowercase()
     Surface(
         shape = RoundedCornerShape(4.dp),
         color = bgColor,
-        modifier = modifier.padding(horizontal = 2.dp),
+        modifier = modifier
+            .padding(horizontal = 2.dp)
+            .semantics {
+                contentDescription = "${node.label}, $variantName indicator"
+            },
     ) {
         Text(
             text = node.label,
@@ -653,7 +682,11 @@ private fun AmeDataList(
     modifier: Modifier,
     depth: Int,
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    val itemSpacing = if (node.dividers) 8.dp else 12.dp
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(itemSpacing),
+    ) {
         node.children.forEachIndexed { index, child ->
             if (node.dividers && index > 0) {
                 HorizontalDivider()
@@ -661,6 +694,47 @@ private fun AmeDataList(
             AmeRenderer(child, formState, onAction, depth = depth + 1)
         }
     }
+}
+
+/**
+ * Structured single-row entry rendered with Material 3 [ListItem].
+ * Material 3's ListItem natively isolates trailing tap targets from the row's
+ * clickable modifier — the trailingContent slot is rendered outside the row's
+ * clickable region — which satisfies the NORMATIVE nested click target rule
+ * (§list_item) without explicit gesture exclusion.
+ */
+@Composable
+private fun AmeListItem(
+    node: AmeNode.ListItem,
+    formState: AmeFormState,
+    onAction: (AmeAction) -> Unit,
+    modifier: Modifier,
+    depth: Int,
+) {
+    val rowAction = node.action
+    val rowModifier = if (rowAction != null) {
+        modifier.clickable { onAction(rowAction) }
+    } else {
+        modifier
+    }
+
+    val subtitle = node.subtitle
+    val leading = node.leading
+    val trailing = node.trailing
+
+    ListItem(
+        headlineContent = { Text(node.title) },
+        supportingContent = if (subtitle != null) {
+            { Text(subtitle) }
+        } else null,
+        leadingContent = if (leading != null) {
+            { AmeRenderer(leading, formState, onAction, depth = depth + 1) }
+        } else null,
+        trailingContent = if (trailing != null) {
+            { AmeRenderer(trailing, formState, onAction, depth = depth + 1) }
+        } else null,
+        modifier = rowModifier,
+    )
 }
 
 /** Grid of text values with a bold header row. */
@@ -696,7 +770,7 @@ private fun AmeTable(node: AmeNode.Table, modifier: Modifier) {
     }
 }
 
-// ── v1.1 Primitives ────────────────────────────────────────────────────────
+// ── Rich Content Primitives ─────────────────────────────────────────────────
 
 /** Delegates to the pluggable [AmeChartRenderer] via [LocalAmeChartRenderer]. */
 @Composable
@@ -705,7 +779,7 @@ private fun AmeChart(node: AmeNode.Chart, modifier: Modifier) {
     renderer.RenderChart(node, modifier)
 }
 
-/** Syntax-highlighted code block with copy affordance. Dark background is intentional (v1.1). */
+/** Syntax-highlighted code block with copy affordance. Dark background is intentional for code contrast. */
 @Composable
 private fun AmeCode(node: AmeNode.Code, modifier: Modifier) {
     Surface(
@@ -754,16 +828,12 @@ private fun AmeCode(node: AmeNode.Code, modifier: Modifier) {
     }
 }
 
-/** Collapsible section with animated chevron and expand/shrink transition.
+/**
+ * Collapsible section with animated chevron and expand/shrink transition.
  *
- * Bug #18 (WP#5): the previous implementation captured `node.expanded`
- * once at first composition, so server-pushed updates to the accordion's
- * expanded state were silently ignored. The fix mirrors the WP#4 Bug 5
- * separate-state pattern: a local `@Composable` snapshot drives the UI,
- * and a [LaunchedEffect] keyed on `node.expanded` syncs the snapshot to
- * the latest external value when the host re-renders. Local user taps
- * still flip `isExpanded` immediately and persist until the next external
- * change. */
+ * External `expanded` changes are tracked via [LaunchedEffect] keyed on
+ * `node.expanded`; local user taps persist until the next external change.
+ */
 @Composable
 private fun AmeAccordion(
     node: AmeNode.Accordion,
@@ -837,7 +907,11 @@ private fun AmeCarousel(
         modifier = modifier.fillMaxWidth()
     ) {
         items(node.children.size) { index ->
-            Box(modifier = Modifier.fillParentMaxWidth(0.85f)) {
+            Box(
+                modifier = Modifier
+                    .fillParentMaxWidth(0.85f)
+                    .widthIn(max = 340.dp)
+            ) {
                 AmeRenderer(node.children[index], formState, onAction, depth = depth + 1)
             }
         }
