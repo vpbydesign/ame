@@ -198,7 +198,7 @@ Changes to the conformance suite follow these rules:
   third-party implementations to change their behavior is a **breaking
   change**. Such PRs MUST carry the `BREAKING-CONFORMANCE` label and
   follow the procedure in
-  [regression-protocol.md](regression-protocol.md) §4. The release
+  [regression-protocol.md](regression-protocol.md). The release
   containing the change requires a minor version bump at minimum, and
   a major bump if the change breaks any documented spec promise.
 - **Removing a test case** is always a major version change.
@@ -206,7 +206,7 @@ Changes to the conformance suite follow these rules:
 The reference implementation is responsible for regenerating
 `*.expected.json` from the corrected Kotlin parser. The script
 [`conformance/regenerate-expected.sh`](../../conformance/regenerate-expected.sh)
-performs this regeneration. See `regression-protocol.md` §4.
+performs this regeneration. See `regression-protocol.md`.
 
 ## 5. Implementing AME on a New Platform
 

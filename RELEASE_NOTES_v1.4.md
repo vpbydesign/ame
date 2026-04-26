@@ -77,7 +77,7 @@ Host apps SHOULD validate against the new audit tests (Bugs 39, 40, 41a, 41b) be
   - `ame-compose/AuditedBugRegressionTest` — 11 → 16 (+5: Bugs 39, 40, 41a, 41b + nested click target Robolectric test).
   - `ame-swiftui/AuditedSwiftUIBugTests` — 11 → 15 (+4: Bugs 39, 40, 41a, 41b).
   - `ame-flutter-ui/audited_ui_bug_regression_test` — 7 → 13 (+6: Bugs 39, 40, 41a, 41b, list_item dispatch, row weights).
-- The Compose nested click target test was written FAILING-FIRST per `regression-protocol.md` §1-2, before the v1.4 `AmeListItem` composable was implemented.
+- The Compose nested click target test was written failing-first, before the v1.4 `AmeListItem` composable was implemented.
 
 ## Migration notes
 
