@@ -178,7 +178,7 @@ git diff conformance/
 
 If the diff modifies any existing `.expected.json` file, your PR MUST
 carry the `BREAKING-CONFORMANCE` label and document each change per
-[`specification/v1.0/regression-protocol.md`](specification/v1.0/regression-protocol.md) §4.
+[`specification/v1.0/regression-protocol.md`](specification/v1.0/regression-protocol.md).
 
 ## Code Style
 

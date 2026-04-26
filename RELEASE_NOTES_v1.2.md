@@ -73,7 +73,7 @@ audit suite (`./verify-bugs.sh`) and a row in
   position; the rule was aspirational and was rejecting common LLM-emitted
   identifiers. WP#3 chose the spec-retraction path with reviewer
   sign-off; the test was inverted to
-  `testEnumValueTokensAreNotReserved` per regression-protocol §8. WP#3.
+  `testEnumValueTokensAreNotReserved`. WP#3.
 - **Bug 10**. Spec table for `chart(... color=...)` aligned to the
   AST: default is `null` (renderer falls back to platform primary), not
   `primary`. Documentation drift, no JSON change. WP#2.
@@ -230,9 +230,8 @@ every claim is canonically recorded in
 
 Where audit tests had to be refined or refactored during fix work
 (Bug 12 in both runtimes; Bug 14 in Compose; Bug 15 in Swift), the
-refinements followed `regression-protocol.md` §8's reviewer-sign-off
-requirement and the rationale is captured in the per-bug verdict
-entries.
+refinements followed the project's reviewer-sign-off requirement and
+the rationale is captured in the per-bug verdict entries.
 
 ## Compatibility
 
